@@ -250,19 +250,33 @@ providers:
 
 what should work at this moment
 
-* grafana docker-ip:3000 or if reverse proxy setup grafana.example.com
-* prometheus at docker-ip:9090
-* pushgateway at docker-ip:9091
+* \<docker-host-ip>:3000 - grafana
+* \<docker-host-ip>:9090 - prometheus 
+* \<docker-host-ip>:9091 - pushgateway 
 
 ### Sending test message to pushgateway
 
 `test.ps1`
 ```ps1
-$body = "test 5`n"
-$body
+$body = "test 3156`n"
 
-Invoke-RestMethod -Method PUT -Uri "http://10.0.19.4:9091/metrics/job/veeam_report" -Body $body -ContentType 'application/json'
+Invoke-RestMethod `
+    -Method PUT `
+    -Uri "http://10.0.19.4:9091/metrics/job/veeam_report" `
+    -Body $body `
+    -ContentType 'application/json'
 ```
+
+[Prometheus requires linux line endings.](
+https://github.com/prometheus/pushgateway/issues/144)<br>
+The "\`n" in the `$body` is to simulate it in windows powershell.
+
+*extra info:*<br>
+In powershell the grave(backtick) character - \` 
+is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
+Here it is used to escape new line and break command in to multiple lines
+fore readability. It is not related to the previous issue.
+
 
 
 # Update
