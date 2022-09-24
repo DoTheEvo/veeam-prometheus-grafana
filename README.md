@@ -90,6 +90,7 @@ services:
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
+    user: root
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -109,6 +110,7 @@ services:
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
+    user: root
     environment:
       - GF_SECURITY_ADMIN_USER
       - GF_SECURITY_ADMIN_PASSWORD
@@ -117,8 +119,8 @@ services:
       - ./grafana_data:/var/lib/grafana
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
-    expose:
-      - 3000
+    ports:
+      - 3000:3000
 
   pushgateway:
     image: prom/pushgateway:v1.4.3
@@ -152,6 +154,18 @@ GF_USERS_ALLOW_SIGN_UP=false
 Which is named in the `.env` file.</br>
 If one does not exist yet: `docker network create caddy_net`
 
+# Reverse proxy
+
+Caddy v2 is used, details
+[here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/caddy_v2).</br>
+
+`Caddyfile`
+```
+grafana.{$MY_DOMAIN} {
+    reverse_proxy grafana:3000
+}
+```
+
 # Prometheus configuration
 
 #### prometheus.yml
@@ -179,10 +193,7 @@ scrape_configs:
 
 # Grafana configuration
 
-Some of the grafana config files could be ommited
-and info passed on the first run, or through settings.
-But setting it through GUI wont generate these files which hinders backup
-and ease of migration.
+...
 
 #### datasource.yml
 
@@ -235,25 +246,23 @@ providers:
 #### \<dashboards>.json
 
 
-# Reverse proxy
+# Testing
 
-Caddy v2 is used, details
-[here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/caddy_v2).</br>
+what should work at this moment
 
-`Caddyfile`
+* grafana docker-ip:3000 or if reverse proxy setup grafana.example.com
+* prometheus at docker-ip:9090
+* pushgateway at docker-ip:9091
+
+### Sending test message to pushgateway
+
+`test.ps1`
+```ps1
+$body = "test 5`n"
+$body
+
+Invoke-RestMethod -Method PUT -Uri "http://10.0.19.4:9091/metrics/job/veeam_report" -Body $body -ContentType 'application/json'
 ```
-grafana.{$MY_DOMAIN} {
-    reverse_proxy grafana:3000
-}
-```
-
-The above config makes grafana available through domain.<br>
-For prometheus and pushgateway use docker ip and port
-
-* prometheus -  <docker-host-ip>:9090.</br>
-* pushgateway -  <docker-host-ip>:9091.</br>
-
----
 
 
 # Update
