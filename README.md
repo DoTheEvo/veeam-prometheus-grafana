@@ -2,7 +2,7 @@
 
 ###### guide-by-example
 
-![logo](https://i.imgur.com/zeAqkZt.png)
+![logo](https://i.imgur.com/xScE6fL.png)
 
 -----------------
 
@@ -254,7 +254,9 @@ what should work at this moment
 * \<docker-host-ip>:9090 - prometheus 
 * \<docker-host-ip>:9091 - pushgateway 
 
-### Sending test message to pushgateway
+### testing how push data to pushgateway
+
+![first_put](https://i.imgur.com/GbC6qSz.png)
 
 `test.ps1`
 ```ps1
@@ -276,8 +278,6 @@ In powershell the grave(backtick) character - \`
 is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
 Here it is used to escape new line and break command in to multiple lines
 fore readability. It is not related to the previous issue.
-
-
 
 # Update
 
