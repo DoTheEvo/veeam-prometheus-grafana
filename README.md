@@ -227,14 +227,11 @@ what should work at this moment
 https://github.com/prometheus/pushgateway/issues/144)<br>
 The "\`n" in the `$body` is to simulate it in windows powershell.
 
-*extra info:*<br>
-In powershell the grave(backtick) character - \` 
+Also in powershell the grave(backtick) character - \` 
 is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
 Here it is used to escape new line, which allows breaking the command
 in to multiple lines for readability.
 It is not related to the previous issue of line endings.
-
-![first_put](https://i.imgur.com/9G0QcuT.png)
 
 `test.ps1`
 ```ps1
@@ -248,6 +245,8 @@ Invoke-RestMethod `
 
 * in the $body we have name of the metrics - `free_disk_space`
 * in the url we have two labels, job - `veeam_report` and instance - `PC1`
+
+![first_put](https://i.imgur.com/9G0QcuT.png)
 
 The metrics and labels help us target the data in grafana.
 
