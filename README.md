@@ -188,7 +188,6 @@ grafana.{$MY_DOMAIN} {
 [Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
 
 A config file for prometheus, bind mounted in to prometheus container.</br>
-Contains the bare minimum setup of targets from where metrics are to be pulled.
 
 `prometheus.yml`
 ```yml
@@ -198,10 +197,11 @@ global:
 
 # A scrape configuration containing exactly one endpoint to scrape.
 scrape_configs:
-  - job_name: 'prometheus'
-    scrape_interval: 10s
+  - job_name: 'pushgateway'
+    scrape_interval: 60s
+    honor_labels: true
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['pushgateway:9091']
 ```
 
 # Grafana configuration
@@ -213,7 +213,7 @@ scrape_configs:
 
 </details>
 
-# Testing
+# Learning in small steps
 
 what should work at this moment
 
@@ -223,19 +223,6 @@ what should work at this moment
 
 ### testing how push data to pushgateway
 
-![first_put](https://i.imgur.com/GbC6qSz.png)
-
-`test.ps1`
-```ps1
-$body = "test 3156`n"
-
-Invoke-RestMethod `
-    -Method PUT `
-    -Uri "http://10.0.19.4:9091/metrics/job/veeam_report" `
-    -Body $body `
-    -ContentType 'application/json'
-```
-
 [Prometheus requires linux line endings.](
 https://github.com/prometheus/pushgateway/issues/144)<br>
 The "\`n" in the `$body` is to simulate it in windows powershell.
@@ -243,6 +230,41 @@ The "\`n" in the `$body` is to simulate it in windows powershell.
 *extra info:*<br>
 In powershell the grave(backtick) character - \` 
 is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
-Here it is used to escape new line and break command in to multiple lines
-for readability. It is not related to the previous issue.
+Here it is used to escape new line, which allows breaking the command
+in to multiple lines for readability.
+It is not related to the previous issue of line endings.
 
+![first_put](https://i.imgur.com/9G0QcuT.png)
+
+`test.ps1`
+```ps1
+$body = "free_disk_space 32`n"
+
+Invoke-RestMethod `
+    -Method PUT `
+    -Uri "http://10.0.19.4:9091/metrics/job/veeam_report/instance/PC1" `
+    -Body $body
+```
+
+* in the $body we have name of the metrics - `free_disk_space`
+* in the url we have two labels, job - `veeam_report` and instance - `PC1`
+
+The metrics and labels help us target the data in grafana.
+
+* create new dashboard, panel
+* switch to Stat type
+* select metric - `free_disk_space` and run the querie
+* switch orientation to Horizontal
+* add transformation - Rename by regex<br>
+  Match - `.+instance="([^"]*).*`<br>
+  Replace - `$1`
+
+should look in the end somewhat like this
+
+
+![first_graph](https://i.imgur.com/lmjE2ga.png)
+
+
+so now whats tested is sending data to pushgateway and visualize them in grafana
+
+Next hurdle is how to best visualize the backups
