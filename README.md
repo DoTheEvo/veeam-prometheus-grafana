@@ -6,17 +6,15 @@
 
 -----------------
 
-**WORK IN PROGRESS**
-
-**WORK IN PROGRESS**
-
+**WORK IN PROGRESS**<br>
+**WORK IN PROGRESS**<br>
 **WORK IN PROGRESS**
 
 ---------------
 
 # Purpose
 
-Monitoring of backups at singular location.
+Centralized monitoring dashboard for many backup jobs.
 
 * [Veeam Backup & Replication Community Edition](
 https://www.veeam.com/virtual-machine-backup-solution-free.html)
@@ -24,11 +22,25 @@ https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Grafana](https://grafana.com/)
 
 A powershell script would be periodicly running on the machine running Veeam,
-that would gather the information about the backup using Get-VBRJob cmdlet.
-
-This info would be pushed to a prometheus pushgateway.
-
+that would gather the information about the backup using Get-VBRJob cmdlet.<br>
+This info would be pushed to a prometheus pushgateway.<br>
 Grafana dashboard would then visualize the information.
+
+# Overview
+
+Components
+
+* machines running veeam B&R
+* scheduled tasks running powershell script on these machines<br>
+  this is probably the weakest link, least reliable component in this setup
+* a dockerhost running container
+  * promethus
+  * pushgateway
+  * grafana
+* alertmanager ... to-do 
+
+<details>
+<summary><h1>Prometheus and Grafana Setup</h1></summary>
 
 # Files and directory structure
 
@@ -98,6 +110,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus_data:/prometheus
@@ -193,58 +206,12 @@ scrape_configs:
 
 # Grafana configuration
 
-...
+* first run login with admin/admin
+* in Preferences > Datasources set `http://prometheus:9090` for url<br>
+  save and test should be green
+* once some values are pushed to prometheus, create a new dashboard...
 
-#### datasource.yml
-
-* /prometheus/grafana/provisioning/datasources/**datasource.yml**
-
-[Official documentation.](https://grafana.com/docs/grafana/latest/administration/provisioning/#datasources)
-
-Grafana's datasources config file, from where it suppose to get metrics.</br>
-In this case it points at the prometheus container.
-
-`datasource.yml`
-```yml
-apiVersion: 1
-
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    orgId: 1
-    url: http://prometheus:9090
-    basicAuth: false
-    isDefault: true
-    editable: false
-```
-
-#### dashboard.yml
-
-* /prometheus/grafana/provisioning/dashboards/**dashboard.yml**
-
-[Official documentation](https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards)
-
-Config file telling grafana from where to load dashboards.
-
-`dashboard.yml`
-```yml
-apiVersion: 1
-
-providers:
-  - name: 'Prometheus'
-    orgId: 1
-    folder: ''
-    type: file
-    disableDeletion: false
-    editable: false
-    allowUiUpdates: false
-    options:
-      path: /etc/grafana/provisioning/dashboards
-```
-
-#### \<dashboards>.json
-
+</details>
 
 # Testing
 
@@ -277,26 +244,5 @@ The "\`n" in the `$body` is to simulate it in windows powershell.
 In powershell the grave(backtick) character - \` 
 is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
 Here it is used to escape new line and break command in to multiple lines
-fore readability. It is not related to the previous issue.
+for readability. It is not related to the previous issue.
 
-# Update
-
-Change version numbers in the compose, then:
-
-- `docker-compose pull`</br>
-- `docker-compose up -d`</br>
-- `docker image prune`
-
-# Backup and restore
-
-#### Backup
-
-Using [borg](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/borg_backup)
-that makes daily snapshot of the entire directory.
-
-#### Restore
-
-* down the prometheus containers `docker-compose down`</br>
-* delete the entire prometheus directory</br>
-* from the backup copy back the prometheus directory</br>
-* start the containers `docker-compose up -d`
