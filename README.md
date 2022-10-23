@@ -246,6 +246,8 @@ Invoke-RestMethod `
 * in the $body we have name of the metrics - `free_disk_space`
 * in the url we have two labels, job - `veeam_report` and instance - `PC1`
 
+Heres how the data look in prometheus when executing `free_disk_space` query
+
 ![first_put](https://i.imgur.com/9G0QcuT.png)
 
 The metrics and labels help us target the data in grafana.
@@ -263,7 +265,8 @@ should look in the end somewhat like this
 
 ![first_graph](https://i.imgur.com/lmjE2ga.png)
 
+*extra info*<br>
+this command deletes all metrics on prometheus, assuming api is enabled<br>
+`curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".+"}'`
 
 so now whats tested is sending data to pushgateway and visualize them in grafana
-
-Next hurdle is how to best visualize the backups
