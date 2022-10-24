@@ -223,7 +223,7 @@ what should work at this moment
 
 ### testing how push data to pushgateway
 
-[Prometheus requires linux line endings.](
+Prometheus requires linux [line endings.](
 https://github.com/prometheus/pushgateway/issues/144)<br>
 The "\`n" in the `$body` is to simulate it in windows powershell.
 
@@ -252,21 +252,24 @@ Heres how the data look in prometheus when executing `free_disk_space` query
 
 The metrics and labels help us target the data in grafana.
 
-* create new dashboard, panel
-* switch to Stat type
-* select metric - `free_disk_space` and run the querie
-* switch orientation to Horizontal
-* add transformation - Rename by regex<br>
+* create **new dashboard**, panel
+* switch type to **Status history**
+* select metric - `free_disk_space`
+* [query options](https://grafana.com/docs/grafana/next/panels-visualizations/query-transform-data/#query-options)
+  * min interval - 1h
+  * relative time - now-10h/h
+* to not deal with long ugly names add transformation - Rename by regex<br>
   Match - `.+instance="([^"]*).*`<br>
   Replace - `$1`
+* can also play with transparency, legend, treshold for pretty colors
 
 should look in the end somewhat like this
 
-
-![first_graph](https://i.imgur.com/lmjE2ga.png)
+![first_graph](https://i.imgur.com/DLnCWdB.png)
 
 *extra info*<br>
-this command deletes all metrics on prometheus, assuming api is enabled<br>
+this command deletes all metrics on prometheus, assuming api is enabled,
+its not immediate<br>
 `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".+"}'`
 
 so now whats tested is sending data to pushgateway and visualize them in grafana
