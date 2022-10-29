@@ -213,7 +213,8 @@ scrape_configs:
 
 </details>
 
-# Learning in small steps
+<details>
+<summary><h1>Learning in small steps</h1></summary>
 
 what should work at this moment
 
@@ -222,6 +223,10 @@ what should work at this moment
 * \<docker-host-ip>:9091 - pushgateway 
 
 ### testing how push data to pushgateway
+
+* metrics must be floats
+* for strings labels passed in url can be used 
+
 
 Prometheus requires linux [line endings.](
 https://github.com/prometheus/pushgateway/issues/144)<br>
@@ -259,7 +264,7 @@ The metrics and labels help us target the data in grafana.
   * min interval - 1h
   * relative time - now-10h/h
 * to not deal with long ugly names add transformation - Rename by regex<br>
-  Match - `.+instance="([^"]*).*`<br>
+  Match - `.+instance="([^"]*).*` - [explained](https://stackoverflow.com/questions/2013124/regex-matching-up-to-the-first-occurrence-of-a-character)<br>
   Replace - `$1`
 * can also play with transparency, legend, treshold for pretty colors
 
@@ -268,8 +273,20 @@ should look in the end somewhat like this
 ![first_graph](https://i.imgur.com/DLnCWdB.png)
 
 *extra info*<br>
-this command deletes all metrics on prometheus, assuming api is enabled,
-its not immediate<br>
-`curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".+"}'`
+[Examples.](https://prometheus.io/docs/prometheus/latest/querying/examples/)
+this command deletes all metrics on prometheus, assuming api is enabled<br>
+`curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
 
 so now whats tested is sending data to pushgateway and visualize them in grafana
+
+</details>
+
+# Powershell script
+
+<%@include file="veeam_prometheus_info_push.ps1"%>
+
+# Grafana dasboads
+
+https://github.com/jorinvo/prometheus-pushgateway-cleaner
+
+https://github.com/prometheus/pushgateway/issues/19
