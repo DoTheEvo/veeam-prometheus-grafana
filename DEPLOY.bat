@@ -17,7 +17,7 @@ if %errorLevel% == 0 (
 
 if not exist "C:\Scripts\" mkdir C:\Scripts
 
-robocopy "%~dp0" "C:\Scripts\" veeam_prometheus_info_push.ps1
+robocopy "%~dp0\" "C:\Scripts" "veeam_prometheus_info_push.ps1"
 
 :: import scheduled task
 schtasks.exe /Create /XML "%~dp0\veeam_prometheus_info_push.xml" /tn "veeam_prometheus_info_push"
