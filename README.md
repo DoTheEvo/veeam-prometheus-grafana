@@ -279,6 +279,9 @@ so now whats tested is sending data to pushgateway and visualize them in grafana
 
 [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)
 
+Windows does not allow execution of powershell scripts by default,
+need to run `Set-ExecutionPolicy RemoteSigned` in powershell console.
+
 switching to https actual use over the internet, my case
 
 * created subdomain `push.example.com` aiming at the server

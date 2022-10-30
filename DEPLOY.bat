@@ -1,6 +1,6 @@
-:: creates scheduled task to executes
-:: weekly on sunday
-
+:: allows powershell scripts
+:: copies ps1 script file to c:\Scripts
+:: creates scheduled task to execute every hour
 
 @echo off
 
@@ -14,6 +14,8 @@ if %errorLevel% == 0 (
     pause
     exit /B
 )
+
+powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
 
 if not exist "C:\Scripts\" mkdir C:\Scripts
 
