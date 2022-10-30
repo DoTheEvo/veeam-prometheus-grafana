@@ -287,6 +287,42 @@ so now whats tested is sending data to pushgateway and visualize them in grafana
 
 # Grafana dasboads
 
+First panel is for seeing last X days and result of backups, at quick glance
+
+* new dashboard > new panel
+* status history
+* select labels job = veeam_report; select metric - veeam_job_result
+* query options - min interval 1m; relative time - `now-7m/m`, later switch to `now-7d/d`
+* transform - regex by name - `.+instance="([^"]*).*`
+* panel title - Backup jobs last X days
+* status history > show values - never
+* treshold
+  * -1 - blue
+  * 0 - green
+  * 1 - yellow
+  * 2 - red
+
+second panel is with more info, most important is age of data
+
+* new panel
+* table
+* select labels job = veeam_report; select metric - push_time_seconds<br>
+  switch from builder to code and `round(time()-push_time_seconds{job="veeam_report"})`<br>
+* options - format - table; type - instant;  
+* rename query from $A to push_time
+* new query
+* select labels job = veeam_report; select metric - veeam_job_duration
+* options - format - table; type - instant;
+* rename query from $A to duration
+* transform - regex by name - `.+instance="([^"]*).*`
+* transform - outer join - field name = instance
+* transform - organize fields - hide time and any other useless columns, rename headers
+* table - standard options - units - seconds
+* override - fields with names - size - standard option - units - bytes(SI)
+
+
+-----
+
 https://github.com/jorinvo/prometheus-pushgateway-cleaner
 
 https://github.com/prometheus/pushgateway/issues/19
