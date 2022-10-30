@@ -51,17 +51,8 @@ Components
         └── prometheus/
             │
             ├── grafana/
-            │   └── provisioning/
-            │       ├── dashboards/
-            │       │   ├── dashboard.yml
-            │       │   └── veeam-backups.json
-            │       │
-            │       └── datasources/
-            │           └── datasource.yml
-            │
             ├── grafana-data/
             ├── prometheus-data/
-            │
             ├── .env
             ├── docker-compose.yml
             └── prometheus.yml
@@ -74,11 +65,8 @@ Components
 * `docker-compose.yml` - a docker compose file, telling docker how to run the containers
 * `prometheus.yml` - a configuration file for prometheus
 
-All files must be provided.</br>
-As well as `grafana` directory and its subdirectories and files.
-
-the directories `grafana-data` and `prometheus-data` are created
-by docker compose on the first run.
+The 3 files must be provided.</br>
+The directories are created by docker compose on the first run.
 
 # docker-compose
 
@@ -140,6 +128,8 @@ services:
     container_name: pushgateway
     hostname: pushgateway
     restart: unless-stopped
+    command:
+      - '--web.enable-admin-api'    
     ports:
       - 9091:9091
 
@@ -176,6 +166,10 @@ Caddy v2 is used, details
 ```
 grafana.{$MY_DOMAIN} {
     reverse_proxy grafana:3000
+}
+
+push.{$MY_DOMAIN} {
+    reverse_proxy pushgateway:9091
 }
 ```
 
@@ -283,7 +277,19 @@ so now whats tested is sending data to pushgateway and visualize them in grafana
 
 # Powershell script
 
-<%@include file="veeam_prometheus_info_push.ps1"%>
+[veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)
+
+switching to https actual use over the internet, my case
+
+* created subdomain `push.example.com` aiming at the server
+* caddy runs as reverse proxy, means it is completely in charge of traffic
+  coming on 80 and 443.<br>
+  The rule from the reverse proxy section in this readme apply,
+  so if something comes at `push.example.com` it gets redirected to <dockerhost>:9091
+* set the uri in the script to `https://push.example.com/metrics/job/...`
+* the script contains line at the begginign to switch to TLS 1.2 from powershell
+  default 1.0
+* should now work
 
 # Grafana dasboads
 
@@ -294,7 +300,7 @@ First panel is for seeing last X days and result of backups, at quick glance
 * select labels job = veeam_report; select metric - veeam_job_result
 * query options - min interval 1m; relative time - `now-7m/m`, later switch to `now-7d/d`
 * transform - regex by name - `.+instance="([^"]*).*`
-* panel title - Backup jobs last X days
+* panel title - Veeam Jobs History
 * status history > show values - never
 * treshold
   * -1 - blue
@@ -309,12 +315,15 @@ second panel is with more info, most important is age of data
 * select labels job = veeam_report; select metric - push_time_seconds<br>
   switch from builder to code and `round(time()-push_time_seconds{job="veeam_report"})`<br>
 * options - format - table; type - instant;  
-* rename query from $A to push_time
+* rename query from $A to push_time_seconds
 * new query
 * select labels job = veeam_report; select metric - veeam_job_duration
+* options - format - table; type - instant
+* rename query from $A to veeam_job_duration
+* new query
+* select labels job = veeam_report; select metric - veeam_job_totalsize
 * options - format - table; type - instant;
-* rename query from $A to duration
-* transform - regex by name - `.+instance="([^"]*).*`
+* rename query from $A to veeam_job_totalsize
 * transform - outer join - field name = instance
 * transform - organize fields - hide time and any other useless columns, rename headers
 * table - standard options - units - seconds
@@ -322,6 +331,14 @@ second panel is with more info, most important is age of data
 
 
 -----
+
+deletion of all data on prometheus and on pushgateway
+
+its useful for learning, but requires opening API in the compose file
+so if not in use remove lines containing `- '--web.enable-admin-api'`
+      
+* `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
+* `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 
 https://github.com/jorinvo/prometheus-pushgateway-cleaner
 

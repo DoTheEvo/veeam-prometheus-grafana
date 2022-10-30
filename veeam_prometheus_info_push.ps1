@@ -8,6 +8,9 @@ Function ConvertToUnixTime([DateTime] $ttt) {
     return $ttt | Get-Date -UFormat %s -Millisecond 0
 }
 
+# WHEN USING HTTPS THIS FORCES TLS 1.2 INSTAD OF POWERSHELL DEFAULT 1.0
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 # GET AN ARRAY OF VEAAM JOBS
 $VeeamJobs = Get-VBRJob | Sort-Object typetostring, name
 
