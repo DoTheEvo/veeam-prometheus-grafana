@@ -296,6 +296,8 @@ switching to https actual use over the internet, my case
 
 # Grafana dasboads
 
+![panel-status-history](https://i.imgur.com/okwj9hJ.png)
+
 First panel is for seeing last X days and result of backups, at quick glance
 
 * new dashboard > new panel
@@ -310,6 +312,8 @@ First panel is for seeing last X days and result of backups, at quick glance
   * 0 - green
   * 1 - yellow
   * 2 - red
+
+![panel-table](https://i.imgur.com/THUmrWq.png)
 
 second panel is with more info, most important is age of data
 
@@ -329,7 +333,7 @@ second panel is with more info, most important is age of data
 * rename query from $A to veeam_job_totalsize
 * transform - outer join - field name = instance
 * transform - organize fields - hide time and any other useless columns, rename headers
-* table - standard options - units - seconds
+* table - standard options - units - seconds; decimals - 0
 * override - fields with names - size - standard option - units - bytes(SI)
 
 
