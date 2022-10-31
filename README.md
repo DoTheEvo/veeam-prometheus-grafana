@@ -111,11 +111,8 @@ services:
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
+    env_file: .env
     user: root
-    environment:
-      - GF_SECURITY_ADMIN_USER
-      - GF_SECURITY_ADMIN_PASSWORD
-      - GF_USERS_ALLOW_SIGN_UP
     volumes:
       - ./grafana_data:/var/lib/grafana
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
@@ -151,6 +148,9 @@ TZ=Europe/Bratislava
 GF_SECURITY_ADMIN_USER=admin
 GF_SECURITY_ADMIN_PASSWORD=admin
 GF_USERS_ALLOW_SIGN_UP=false
+
+#GF_DATE_FORMATS_INTERVAL_HOUR = dddd
+#GF_DATE_FORMATS_INTERVAL_DAY = dddd
 ```
 
 **All containers must be on the same network**.</br>
