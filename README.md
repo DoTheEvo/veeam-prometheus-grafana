@@ -86,7 +86,7 @@ services:
 
   # MONITORING SYSTEM AND THE METRICS DATABASE
   prometheus:
-    image: prom/prometheus:v2.38.0
+    image: prom/prometheus:v2.39.1
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -107,7 +107,7 @@ services:
 
   # WEB BASED UI VISUALISATION OF THE METRICS
   grafana:
-    image: grafana/grafana:9.1.1
+    image: grafana/grafana:9.2.3
     container_name: grafana
     hostname: grafana
     restart: unless-stopped

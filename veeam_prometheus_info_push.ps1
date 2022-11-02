@@ -1,6 +1,8 @@
 # ----------------------------------------------------------------------------
 
 $group = "CocaCola"
+$base_url = "http://10.0.19.4:9091"
+# $base_url = "https://push.example.com"
 
 # ----------------------------------------------------------------------------
 
@@ -52,6 +54,6 @@ $body
 # ONLY A UNIQUE URL CREATES A NEW UNIQUE ENTRY
 Invoke-RestMethod `
     -Method PUT `
-    -Uri "http://10.0.19.4:9091/metrics/job/veeam_report/instance/$JobName/group/$group" `
+    -Uri "$base_url/metrics/job/veeam_report/instance/$JobName/group/$group/job_type/$JobType" `
     -Body $body
 }
