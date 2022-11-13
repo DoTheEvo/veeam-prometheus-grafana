@@ -14,17 +14,17 @@
 
 # Purpose
 
-Centralized monitoring dashboard for many backup jobs.
+Centralized monitoring dashboard for Veeam backup jobs.
 
 * [Veeam Backup & Replication Community Edition](
 https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Prometheus](https://prometheus.io/)
 * [Grafana](https://grafana.com/)
 
-A powershell script would be periodicly running on the machine running Veeam,
-that would gather the information about the backup using Get-VBRJob cmdlet.<br>
-This info would be pushed to a prometheus pushgateway.<br>
-Grafana dashboard would then visualize the information.
+A powershell script periodicly runs on the machine running Veeam, gathering
+information about the backup jobs using Get-VBRJob cmdlet.<br>
+This info gets pushed to a prometheus pushgateway.<br>
+Grafana dashboard then visualizes the information.
 
 # Overview
 
@@ -32,7 +32,7 @@ Components
 
 * machines running veeam B&R
 * scheduled tasks running powershell script on these machines<br>
-  this is probably the weakest link, least reliable component in this setup
+  this script is likely the weakest link, the least reliable component of the setup
 * a dockerhost running container
   * promethus
   * pushgateway
@@ -70,15 +70,12 @@ The directories are created by docker compose on the first run.
 
 # docker-compose
 
-Five containers to spin up.</br>
-While [stefanprodan/dockprom](https://github.com/stefanprodan/dockprom)
-also got alertmanager and pushgateway, this is a simpler setup for now.</br>
-Just want pretty graphs.
+Three containers to spin up.</br>
 
 * **Prometheus** - prometheus server, pulling, storing, evaluating metrics
+* **Pushgateway** - service ready to receive pushed information at an open port
 * **Grafana** - web UI visualization of the collected metrics
   in nice dashboards
-* **Pushgateway** - service ready to receive pushed information at an open port
 
 `docker-compose.yml`
 ```yml
@@ -149,6 +146,7 @@ GF_SECURITY_ADMIN_USER=admin
 GF_SECURITY_ADMIN_PASSWORD=admin
 GF_USERS_ALLOW_SIGN_UP=false
 
+# DATE FORMATS SWITCHED TO THEN NAMES OF THE DAYS OF THE WEEK
 #GF_DATE_FORMATS_INTERVAL_HOUR = dddd
 #GF_DATE_FORMATS_INTERVAL_DAY = dddd
 ```
@@ -221,7 +219,6 @@ what should work at this moment
 * metrics must be floats
 * for strings labels passed in url can be used 
 
-
 Prometheus requires linux [line endings.](
 https://github.com/prometheus/pushgateway/issues/144)<br>
 The "\`n" in the `$body` is to simulate it in windows powershell.
@@ -275,24 +272,69 @@ so now whats tested is sending data to pushgateway and visualize them in grafana
 
 </details>
 
-# Powershell script
+# The powershell script
 
-[veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)
+**The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
 Windows does not allow execution of powershell scripts by default,
 need to run `Set-ExecutionPolicy RemoteSigned` in powershell console.
 
-switching to https actual use over the internet, my case
+The script at the start was pretty clean and readable.
+But with use there were cases where backups were missing in grafana.
+Turns out that some values gathered were not as expected, or null and that threw error
+and so no data were pushed for that job.<br>
+And so the script becomes more cluttered with checks if data exists before
+going in to variable.
+Ideally more work should be done on this data validation for some more robustness.
 
-* created subdomain `push.example.com` aiming at the server
+### The script deployment
+
+To help deploy reliably
+
+* download [this repo](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
+* exract
+* run DEPLOY.bat as administrator
+* go edit `C:\Scripts\veeam_prometheus_info_push.ps1` to change group name and base_url
+* done
+
+What happens under the hood:
+
+* DEPLOY - checks if its run as administrator, ends if not
+* DEPLOY - enables powershel scripts execution on that windows PC
+* DEPLOY - creates directory C:\Scripts if it does not existing
+* DEPLOY - copies / overwrites veeam_prometheus_info_push.ps1 in to C:\Scripts
+* DEPLOY - imports taskscheduler xml task named veeam_prometheus_info_push
+* TASKSCHEDULER - the task executes every hour with random delay of 30seconds
+* TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
+
+
+# Pushgateway
+
+Ideally one uses a subdomain and https for pushgateway, for that:
+
+* created subdomain `push.example.com` and DNS record aiming at the servers public IP
 * caddy runs as reverse proxy, means it is completely in charge of traffic
   coming on 80 and 443.<br>
-  The rule from the reverse proxy section in this readme apply,
+  The rule from the reverse proxy section in this Readme apply,
   so if something comes at `push.example.com` it gets redirected to <dockerhost>:9091
-* set the uri in the script to `https://push.example.com/metrics/job/...`
-* the script contains line at the begginign to switch to TLS 1.2 from powershell
+* make sure the `$base_url` in the script is `https://push.example.com`
+* the script contains a line at the begginign to switch to TLS 1.2 from powershells
   default 1.0
 * should now work
+
+To delete all data from pushgateway
+
+* `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
+* `curl -X PUT https://push.example.com/api/v1/admin/wipe`
+
+# Prometheus
+
+Nothing really to do here.
+You can access it from LAN side with `<dockerhost>:9090` to check some data.
+
+To delete all metrics on prometheus
+
+* `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
 
 # Grafana dasboads
 
@@ -303,19 +345,21 @@ First panel is for seeing last X days and result of backups, at quick glance
 * new dashboard > new panel
 * status history
 * select labels job = veeam_report; select metric - veeam_job_result
-* query options - min interval 1m; relative time - `now-7m/m`, later switch to `now-7d/d`
+* query options - min interval 1m, or 10m, or 1h, or 1d<br>
+  this value sets the size of rectangle in status history panel
 * transform - regex by name - `.+instance="([^"]*).*`
-* panel title - Veeam Jobs History
+* panel title - Veeam History
 * status history > show values - never
-* treshold
-  * -1 - blue
-  * 0 - green
-  * 1 - yellow
-  * 2 - red
+* Value mapping and Tresholds
+  * 0 - green - Successful
+  * 1 - yellow - Warning
+  * 2 - red - Failed
+  * -1 - blue - running
+  * -2 - black - Disabled | Unscheduled
 
 ![panel-table](https://i.imgur.com/THUmrWq.png)
 
-second panel is with more info, most important is age of data
+Second panel is with more info, the most important is "Last Report"
 
 * new panel
 * table
