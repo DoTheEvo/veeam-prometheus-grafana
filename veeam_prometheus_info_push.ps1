@@ -1,3 +1,4 @@
+# v0.1  ----------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
 $group = "CocaCola"
@@ -6,7 +7,8 @@ $base_url = "http://10.0.19.4:9091"
 
 # ----------------------------------------------------------------------------
 
-Function ConvertToUnixTime([DateTime] $ttt) {
+Function ConvertToUnixTime([AllowNull()][Nullable[DateTime]] $ttt) {
+    if (!$ttt) { return 0 }
     return $ttt | Get-Date -UFormat %s -Millisecond 0
 }
 
@@ -20,21 +22,35 @@ $VeeamJobs = Get-VBRJob | Sort-Object typetostring, name
 foreach ($Job in $VeeamJobs) {
 
 $JobName = $Job.Name
+$JobType = $Job.JobType
 
-# SUCCESS=0 WARNING=1 FAILED=2 RUNNING=-1
+# SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1 | ++DISABLED NONT SCHEDULED=-2
 $LastJobResultCode = $Job.GetLastResult().value__
 
-# POSSIBLE VALUES TO SEND IF PROMETHEUS WAS NOT LIMITED TO FLOATS METRICS
-# ALTERNATIVE IS PUTTING IT AS LABEL, BUT THAT NEEDS SOME SANITATION
-$JobDescription = $Job.Description
-$JobType = $Job.JobType
-$JobRepo = $Job.GetTargetRepository().FriendlyPath
+# IF THE JOB IS NOT SCHEDULED OR DISABLED SET THE VALUE LastJobResultCode TO -2
+# Options.JobOptions.RunManually -
+#   - TRUE IF THE JOB HAS UNCHECKED CHECKBOX - Run the job automaticly
+# IsScheduleEnabled
+#   - FALSE IF THE JOB IS SET AS DISABLED
+
+if ($Job.Options.JobOptions.RunManually) { $LastJobResultCode = -2}
+if (!$Job.IsScheduleEnabled) { $LastJobResultCode = -2}
 
 $LastSession = $Job.FindLastSession()
 $StartTimeLocalEpoch = ConvertToUnixTime($LastSession.progress.StartTimeLocal)
 $StopTimeLocalEpoch = ConvertToUnixTime($LastSession.progress.StopTimeLocal)
-$DurationInSeconds = $LastSession.progress.Duration.TotalSeconds
-$TotalSize = $LastSession.Info.BackupTotalSize
+
+if ($LastSession.progress.Duration.TotalSeconds) {
+    $DurationInSeconds = $LastSession.progress.Duration.TotalSeconds
+} else {
+    $DurationInSeconds = 0
+}
+
+if ($LastSession.Info.BackupTotalSize) {
+    $TotalSize = $LastSession.Info.BackupTotalSize
+} else {
+    $TotalSize = 0
+}
 
 # PROMETHEUS REQUIRES LINUX LINE ENDIG, SO \r\n IS REPLACED WITH \n
 # ALSO POWERSHELL FEATURE "Here-Strings" IS USED @""@ DEFINES BLOCK OF TEXT
