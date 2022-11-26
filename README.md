@@ -280,16 +280,14 @@ Windows does not allow execution of powershell scripts by default,
 need to run `Set-ExecutionPolicy RemoteSigned` in powershell console.
 
 The script at the start was pretty clean and readable.
-But with use there were cases where backups were missing in grafana.
-Turns out that some values gathered were not as expected, or null and that threw error
-and so no data were pushed for that job.<br>
-And so the script becomes more cluttered with checks if data exists before
-going in to variable.
-Ideally more work should be done on this data validation for some more robustness.
+But with actual use there were errors and missing backups when values queried were null.
+And so the script becomes more cluttered with checks if data exists before pushing.<br>
+Ideally more work should be done on this data validation for more robustness,
+to really check every single queried value... but maybe later...
 
 ### The script deployment
 
-To help deploy reliably
+To ease installation process
 
 * download [this repo](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
 * exract
@@ -299,16 +297,17 @@ To help deploy reliably
 
 What happens under the hood:
 
-* DEPLOY - checks if its run as administrator, ends if not
-* DEPLOY - enables powershel scripts execution on that windows PC
-* DEPLOY - creates directory C:\Scripts if it does not existing
-* DEPLOY - copies / overwrites veeam_prometheus_info_push.ps1 in to C:\Scripts
-* DEPLOY - imports taskscheduler xml task named veeam_prometheus_info_push
+* DEPLOY.bat - checks if its run as administrator, ends if not
+* DEPLOY.bat - enables powershel scripts execution on that windows PC
+* DEPLOY.bat - creates directory C:\Scripts if it does not existing
+* DEPLOY.bat - copies / overwrites veeam_prometheus_info_push.ps1 in to C:\Scripts
+* DEPLOY.bat - imports taskscheduler xml task named veeam_prometheus_info_push
 * TASKSCHEDULER - the task executes every hour with random delay of 30seconds
 * TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
 
-
 # Pushgateway
+
+![pic_pushgateway](https://i.imgur.com/4GZIu8g.png)
 
 Ideally one uses a subdomain and https for pushgateway, for that:
 
@@ -329,12 +328,33 @@ To delete all data from pushgateway
 
 # Prometheus
 
-Nothing really to do here.
-You can access it from LAN side with `<dockerhost>:9090` to check some data.
+![pic_prometheus](https://i.imgur.com/YzNWZQb.png)
+
+You can access its web interface from LAN side with `<dockerhost>:9090` or
+you can setup webaccess to it from outside too if you wish.
+Same process as with pushgateway or any other webserver accessible through caddy.
+
+[Official documentation on queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+
+To query something just write plain metrics value, like `veeam_job_result`.
+But in the table tab it shows you by default only the result from a recent
+time window. You can switch to what date you want query too apply,
+or switch to graph view and set range to few weeks.
+
+More targeted query, with the use of regex, signified by `=~`
+
+  * `veeam_job_result{instance=~"Backup Copy Job.*"}`
 
 To delete all metrics on prometheus
 
-* `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
+  * `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
+
+To delete metrics based off instance or group
+
+* `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={instance=~"^Backup.Copy.Job.*"}'`
+* `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={group=~"cocacola"}'`
+
+Theres no white space in the query, so dots are used.
 
 # Grafana dasboads
 
