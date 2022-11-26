@@ -6,6 +6,7 @@ $base_url = "http://10.0.19.4:9091"
 # $base_url = "https://push.example.com"
 
 # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 Function ConvertToUnixTime([AllowNull()][Nullable[DateTime]] $ttt) {
     if (!$ttt) { return 0 }
@@ -14,6 +15,9 @@ Function ConvertToUnixTime([AllowNull()][Nullable[DateTime]] $ttt) {
 
 # WHEN USING HTTPS THIS FORCES TLS 1.2 INSTAD OF POWERSHELL DEFAULT 1.0
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 # GET AN ARRAY OF VEAAM JOBS
 $VeeamJobs = Get-VBRJob | Sort-Object typetostring, name
@@ -24,15 +28,13 @@ foreach ($Job in $VeeamJobs) {
 $JobName = $Job.Name
 $JobType = $Job.JobType
 
-# SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1 | ++DISABLED NONT SCHEDULED=-2
+# SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1 | +DISABLED OR NOT SCHEDULED=-2
 $LastJobResultCode = $Job.GetLastResult().value__
 
-# IF THE JOB IS NOT SCHEDULED OR DISABLED SET THE VALUE LastJobResultCode TO -2
+# IF THE JOB IS NOT SCHEDULED OR DISABLED, SET LastJobResultCode TO -2
 # Options.JobOptions.RunManually -
 #   - TRUE IF THE JOB HAS UNCHECKED CHECKBOX - Run the job automaticly
-# IsScheduleEnabled
-#   - FALSE IF THE JOB IS SET AS DISABLED
-
+# IsScheduleEnabled - FALSE IF THE JOB IS SET AS SET TO DISABLED
 if ($Job.Options.JobOptions.RunManually) { $LastJobResultCode = -2}
 if (!$Job.IsScheduleEnabled) { $LastJobResultCode = -2}
 
@@ -53,7 +55,7 @@ if ($LastSession.Info.BackupTotalSize) {
 }
 
 # PROMETHEUS REQUIRES LINUX LINE ENDIG, SO \r\n IS REPLACED WITH \n
-# ALSO POWERSHELL FEATURE "Here-Strings" IS USED @""@ DEFINES BLOCK OF TEXT
+# ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
 # THE EMPTY LINE IS REQUIRED
 $body = @"
 veeam_job_result $LastJobResultCode

@@ -14,27 +14,28 @@
 
 # Purpose
 
-Centralized monitoring dashboard for Veeam backup jobs.
+Centralized monitoring dashboard for Veeam B&R community edition backup jobs.
 
 * [Veeam Backup & Replication Community Edition](
 https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Prometheus](https://prometheus.io/)
 * [Grafana](https://grafana.com/)
 
-A powershell script periodicly runs on the machine running Veeam, gathering
-information about the backup jobs using Get-VBRJob cmdlet.<br>
+A powershell script periodicly runs on the machine running Veeam,
+gathering information about the backup-jobs using Get-VBRJob cmdlet.<br>
 This info gets pushed to a prometheus pushgateway.<br>
 Grafana dashboard then visualizes the information.
 
-![dashboard_pic](https://i.imgur.com/PH6XCMd.png)
+![dashboard_pic](https://i.imgur.com/hek3Y7D.png)
 
 # Overview
 
 Components
 
-* machines running veeam B&R
-* scheduled tasks running powershell script on these machines<br>
-  this script is likely the weakest link, the least reliable component of the setup
+* machines running Veeam B&R
+* scheduled task running powershell script on these machines<br>
+  this script is likely the weakest link,
+  the least reliable component of the setup
 * a dockerhost running container
   * promethus
   * pushgateway
@@ -202,7 +203,7 @@ scrape_configs:
 
 * first run login with admin/admin
 * in Preferences > Datasources set `http://prometheus:9090` for url<br>
-  save and test should be green
+  save and test should be green<br>
 * once some values are pushed to prometheus, create a new dashboard...
 
 </details>
@@ -216,10 +217,10 @@ what should work at this moment
 * \<docker-host-ip>:9090 - prometheus 
 * \<docker-host-ip>:9091 - pushgateway 
 
-### testing how push data to pushgateway
+### testing how to push data to pushgateway
 
 * metrics must be floats
-* for strings labels passed in url can be used 
+* for strings, labels passed in url are used 
 
 Prometheus requires linux [line endings.](
 https://github.com/prometheus/pushgateway/issues/144)<br>
@@ -227,9 +228,9 @@ The "\`n" in the `$body` is to simulate it in windows powershell.
 
 Also in powershell the grave(backtick) character - \` 
 is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
-Here it is used to escape new line, which allows breaking the command
-in to multiple lines for readability.
-It is not related to the previous issue of line endings.
+Here it is used to escape new line. This allows breaking the command
+in to multiple easier to read lines.
+This is not related to the previous issue of line endings.
 
 `test.ps1`
 ```ps1
@@ -278,21 +279,34 @@ so now whats tested is sending data to pushgateway and visualize them in grafana
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
-Windows does not allow execution of powershell scripts by default,
-need to run `Set-ExecutionPolicy RemoteSigned` in powershell console.
+Windows by default does not allow execution of powershell scripts,
+got to `Set-ExecutionPolicy RemoteSigned` in powershell console.
 
-The script at the start was pretty clean and readable.
+Veeam ofters [many cmdlets](https://helpcenter.veeam.com/docs/backup/powershell/cmdlets.html) to use with B&R installation.
+
+* [Get-VBRJob](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrjob.html)
+  - is the only one used in the script. Not all info for all type of jobs is available.
+  But enought for dashboard to visualize current status.
+* [Get-VBRBackup](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackup.html?ver=110)
+  - not used, but played with to get better size and repository info,
+  but does not seem to work very well for many jobs
+* [Get-VBRBackupSession](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackupsession.html)
+  - not used, but played with to get better info on why job ended with warning or fail
+
+The script itself is pretty readable and comes with comments.
+
+It started being pretty clean.
 But with actual use there were errors and missing backups when values queried were null.
-And so the script becomes more cluttered with checks if data exists before pushing.<br>
-Ideally more work should be done on this data validation for more robustness,
-to really check every single queried value... but maybe later...
+And so the script becomes more cluttered with checks if data exists when querying.<br>
+Ideally more work should be done on this data validation for better reliability,
+to really check every single queried value... but maybe later...  
 
 ### The script deployment
 
-To ease installation process
+To ease the installation process
 
 * download [this repo](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
-* exract
+* extract
 * run DEPLOY.bat as administrator
 * go edit `C:\Scripts\veeam_prometheus_info_push.ps1` to change group name and base_url
 * done
@@ -300,11 +314,11 @@ To ease installation process
 What happens under the hood:
 
 * DEPLOY.bat - checks if its run as administrator, ends if not
-* DEPLOY.bat - enables powershel scripts execution on that windows PC
+* DEPLOY.bat - enables powershell scripts execution on that windows PC
 * DEPLOY.bat - creates directory C:\Scripts if it does not existing
 * DEPLOY.bat - copies / overwrites veeam_prometheus_info_push.ps1 in to C:\Scripts
 * DEPLOY.bat - imports taskscheduler xml task named veeam_prometheus_info_push
-* TASKSCHEDULER - the task executes every hour with random delay of 30seconds
+* TASKSCHEDULER - the task executes every hour with random delay of 30 seconds
 * TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
 
 # Pushgateway
@@ -316,15 +330,16 @@ Ideally one uses a subdomain and https for pushgateway, for that:
 * created subdomain `push.example.com` and DNS record aiming at the servers public IP
 * caddy runs as reverse proxy, means it is completely in charge of traffic
   coming on 80 and 443.<br>
-  The rule from the reverse proxy section in this Readme apply,
+  The rule from the reverse proxy section in this Readme applies,
   so if something comes at `push.example.com` it gets redirected to <dockerhost>:9091
 * make sure the `$base_url` in the script is `https://push.example.com`
-* the script contains a line at the begginign to switch to TLS 1.2 from powershells
+* the script contains a line at the begging to switch to TLS 1.2 from powershells
   default 1.0
 * should now work
 
 To delete all data from pushgateway
 
+* from web interface theres a button
 * `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 * `curl -X PUT https://push.example.com/api/v1/admin/wipe`
 
@@ -332,8 +347,9 @@ To delete all data from pushgateway
 
 ![pic_prometheus](https://i.imgur.com/YzNWZQb.png)
 
-You can access its web interface from LAN side with `<dockerhost>:9090` or
-you can setup webaccess to it from outside too if you wish.
+Not much really to do once it runs.Checking values and delete them I guess.<br>
+You can access its web interface from LAN side with `<dockerhost>:9090`, or
+you can setup web access to it from the outside if you wish.
 Same process as with pushgateway or any other webserver accessible through caddy.
 
 [Official documentation on queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)
@@ -358,7 +374,7 @@ To delete metrics based off instance or group
 
 Theres no white space in the query, so dots are used.
 
-# Grafana dasboads
+# Grafana dashboads
 
 ![panel-status-history](https://i.imgur.com/okwj9hJ.png)
 
@@ -372,7 +388,7 @@ First panel is for seeing last X days and result of backups, at quick glance
 * transform - regex by name - `.+instance="([^"]*).*`
 * panel title - Veeam History
 * status history > show values - never
-* Value mapping and Tresholds
+* Value mapping and Thresholds
   * 0 - green - Successful
   * 1 - yellow - Warning
   * 2 - red - Failed
