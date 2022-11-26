@@ -26,6 +26,8 @@ information about the backup jobs using Get-VBRJob cmdlet.<br>
 This info gets pushed to a prometheus pushgateway.<br>
 Grafana dashboard then visualizes the information.
 
+![dashboard_pic](https://i.imgur.com/PH6XCMd.png)
+
 # Overview
 
 Components
