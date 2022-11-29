@@ -360,7 +360,7 @@ there might be some benefit to daily wiping it.
 For this a simple systemd service and its timer are used.
 
 `pushgateway_wipe.service`
-```YAML
+```INI
 [Unit]
 Description=wipe clean prometheus pushgateway
 
@@ -373,7 +373,7 @@ ExecStart=curl -X PUT https://push.example.com/api/v1/admin/wipe
 ```
 
 `pushgateway_wipe.timer`
-```YAML
+```INI
 [Unit]
 Description=wipe clean prometheus pushgateway timer
  
