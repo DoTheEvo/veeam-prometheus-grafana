@@ -40,7 +40,7 @@ Components
   * promethus
   * pushgateway
   * grafana
-* alertmanager ... to-do 
+  * alertmanager ... to-do 
 
 <details>
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
@@ -287,14 +287,14 @@ got to `Set-ExecutionPolicy RemoteSigned` in powershell console.
 
 Veeam ofters [many cmdlets](https://helpcenter.veeam.com/docs/backup/powershell/cmdlets.html) to use with B&R installation.
 
-* [Get-VBRJob](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrjob.html)
-  - is the only one used in the script. Not all info for all type of jobs is available.
+* [Get-VBRJob](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrjob.html)<br>
+  is the only one used in the script. Not all info for all type of jobs is available.
   But enought for dashboard to visualize current status.
-* [Get-VBRBackup](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackup.html?ver=110)
-  - not used, but played with to get better size and repository info,
+* [Get-VBRBackup](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackup.html)<br>
+  not used, but played with to get better size and repository info,
   but does not seem to work very well for many jobs
-* [Get-VBRBackupSession](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackupsession.html)
-  - not used, but played with to get better info on why job ended with warning or fail
+* [Get-VBRBackupSession](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackupsession.html)<br>
+  not used, but played with to get better info on why job ended with warning or fail
 
 The script itself is pretty readable and comes with comments.
 
@@ -345,6 +345,41 @@ To delete all data from pushgateway
 * from web interface theres a button
 * `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 * `curl -X PUT https://push.example.com/api/v1/admin/wipe`
+
+### periodily wiping clean the pushgateway
+
+Without any action the pushed metrics sit on the pushgateway forever.
+[This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
+But to visualize the lack of information coming from the machines
+there might be some benefit to daily wiping it.
+
+For this a simple systemd service and its timer are used.
+
+`pushgateway_wipe.service`
+```TOML
+[Unit]
+Description=wipe clean prometheus pushgateway
+
+[Service]
+Type=simple
+Nice=19
+IOSchedulingClass=2
+IOSchedulingPriority=7
+ExecStart=curl -X PUT https://push.example.com/api/v1/admin/wipe
+```
+
+`pushgateway_wipe.timer`
+```TOML
+[Unit]
+Description=wipe clean prometheus pushgateway timer
+ 
+[Timer]
+WakeSystem=false
+OnCalendar=00:30:00
+ 
+[Install]
+WantedBy=timers.target
+```
 
 # Prometheus
 
@@ -432,6 +467,3 @@ so if not in use remove lines containing `- '--web.enable-admin-api'`
 * `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
 * `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 
-https://github.com/jorinvo/prometheus-pushgateway-cleaner
-
-https://github.com/prometheus/pushgateway/issues/19
