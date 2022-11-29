@@ -278,6 +278,10 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 </details>
 
+---
+---
+---
+
 # The powershell script
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
@@ -285,11 +289,11 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 Windows by default does not allow execution of powershell scripts,
 got to `Set-ExecutionPolicy RemoteSigned` in powershell console.
 
-Veeam ofters [many cmdlets](https://helpcenter.veeam.com/docs/backup/powershell/cmdlets.html) to use with B&R installation.
+Veeam offers [many cmdlets](https://helpcenter.veeam.com/docs/backup/powershell/cmdlets.html) to use with B&R installation.
 
 * [Get-VBRJob](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrjob.html)<br>
   is the only one used in the script. Not all info for all type of jobs is available.
-  But enought for dashboard to visualize current status.
+  But enough for dashboard to visualize current status.
 * [Get-VBRBackup](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackup.html)<br>
   not used, but played with to get better size and repository info,
   but does not seem to work very well for many jobs
@@ -356,7 +360,7 @@ there might be some benefit to daily wiping it.
 For this a simple systemd service and its timer are used.
 
 `pushgateway_wipe.service`
-```TOML
+```YAML
 [Unit]
 Description=wipe clean prometheus pushgateway
 
@@ -369,7 +373,7 @@ ExecStart=curl -X PUT https://push.example.com/api/v1/admin/wipe
 ```
 
 `pushgateway_wipe.timer`
-```TOML
+```YAML
 [Unit]
 Description=wipe clean prometheus pushgateway timer
  
