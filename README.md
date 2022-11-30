@@ -316,8 +316,9 @@ The file that eases the installation process
 
 * download [this repo](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
 * extract
-* run DEPLOY.cmd as administrator
-* go edit `C:\Scripts\veeam_prometheus_info_push.ps1` to change group name and base_url
+* run `DEPLOY.cmd` as administrator
+* go edit `C:\Scripts\veeam_prometheus_info_push.ps1`
+  to change the `group` name and `base_url`
 * done
 
 What happens under the hood:
@@ -336,12 +337,12 @@ What happens under the hood:
 
 Ideally one uses a subdomain and https for pushgateway, for that:
 
-* created subdomain `push.example.com` and DNS record aiming at the servers public IP
+* have subdomain `push.example.com` and DNS record aiming at the servers public IP
 * caddy runs as reverse proxy, means it is completely in charge of traffic
   coming on 80 and 443.<br>
   The rule from the reverse proxy section in this Readme applies,
   so if something comes at `push.example.com` it gets redirected to <dockerhost>:9091
-* make sure the `$base_url` in the script is `https://push.example.com`
+* the `$base_url` in the script is `https://push.example.com`
 * the script contains a line at the begging to switch to TLS 1.2 from powershells
   default 1.0
 * should now work
@@ -356,10 +357,10 @@ To delete all data from pushgateway
 
 Without any action the pushed metrics sit on the pushgateway forever.
 [This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
-But to visualize the lack of information coming from the machines
-there might be some benefit to daily wiping it.
+But to better visualize the lack of information coming from the machines
+there might be some benefit to daily wiping pushgateway clean.
 
-For this a simple systemd service and its timer are used.
+For this the dockerhost can have a simple systemd service and timer.
 
 `pushgateway_wipe.service`
 ```INI
@@ -382,6 +383,8 @@ OnCalendar=00:19:00
 [Install]
 WantedBy=timers.target
 ```
+
+enable the timer: `sudo systemctl enable pushgateway_wipe.timer`
 
 # Prometheus
 

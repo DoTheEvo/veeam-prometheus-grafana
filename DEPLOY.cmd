@@ -18,13 +18,12 @@ if %errorLevel% == 0 (
 echo - powershell ExecutionPolicy changing to RemoteSigned
 powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
 
-
 echo - copying veeam_prometheus_info_push.ps1 in to C:\Scripts\
 if not exist "C:\Scripts\" mkdir C:\Scripts
 robocopy "%~dp0\" "C:\Scripts" "veeam_prometheus_info_push.ps1" /NDL /NJH /NJS
 
-
-:: import scheduled task
+:: import scheduled task, will not overwrite
+:: delete the task in taskschd.msc if you want fresh import
 
 if exist C:\Windows\System32\Tasks\veeam_prometheus_info_push (
     echo - scheduled task with that name already exists, skipping
@@ -33,4 +32,3 @@ if exist C:\Windows\System32\Tasks\veeam_prometheus_info_push (
 )
 
 pause
-
