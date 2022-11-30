@@ -390,7 +390,11 @@ enable the timer: `sudo systemctl enable pushgateway_wipe.timer`
 
 ![pic_prometheus](https://i.imgur.com/YzNWZQb.png)
 
-Not much really to do once it runs. Checking values and delete them I guess.<br>
+In the compose file the data retention is set to 45 days.
+
+* `--storage.tsdb.retention.time=45d`
+
+Not much really to do once it runs. Checking values and deleting them I guess.<br>
 You can access its web interface from LAN side with `<dockerhost>:9090`, or
 you can setup web access to it from the outside if you wish.
 Same process as with pushgateway or any other webserver accessible through caddy.
