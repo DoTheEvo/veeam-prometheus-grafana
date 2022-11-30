@@ -21,7 +21,7 @@ https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Prometheus](https://prometheus.io/)
 * [Grafana](https://grafana.com/)
 
-A powershell script periodicly runs on the machine running Veeam,
+A powershell script periodicly runs on machines running Veeam,
 gathering information about the backup-jobs using Get-VBRJob cmdlet.<br>
 This info gets pushed to a prometheus pushgateway.<br>
 Grafana dashboard then visualizes the information.
@@ -366,20 +366,16 @@ Description=wipe clean prometheus pushgateway
 
 [Service]
 Type=simple
-Nice=19
-IOSchedulingClass=2
-IOSchedulingPriority=7
 ExecStart=curl -X PUT https://push.example.com/api/v1/admin/wipe
 ```
 
 `pushgateway_wipe.timer`
 ```INI
 [Unit]
-Description=wipe clean prometheus pushgateway timer
+Description=wipe clean prometheus pushgateway
  
 [Timer]
-WakeSystem=false
-OnCalendar=00:30:00
+OnCalendar=00:19:00
  
 [Install]
 WantedBy=timers.target
