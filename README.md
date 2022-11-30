@@ -310,23 +310,23 @@ And so the script becomes more cluttered with checks if data exists when queryin
 Ideally more work should be done on this data validation for better reliability,
 to really check every single queried value... but maybe later...  
 
-### The script deployment
+### DEPLOY.cmd file
 
-To ease the installation process
+The file that eases the installation process
 
 * download [this repo](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
 * extract
-* run DEPLOY.bat as administrator
+* run DEPLOY.cmd as administrator
 * go edit `C:\Scripts\veeam_prometheus_info_push.ps1` to change group name and base_url
 * done
 
 What happens under the hood:
 
-* DEPLOY.bat - checks if its run as administrator, ends if not
-* DEPLOY.bat - enables powershell scripts execution on that windows PC
-* DEPLOY.bat - creates directory C:\Scripts if it does not existing
-* DEPLOY.bat - copies / overwrites veeam_prometheus_info_push.ps1 in to C:\Scripts
-* DEPLOY.bat - imports taskscheduler xml task named veeam_prometheus_info_push
+* DEPLOY.cmd - checks if its run as administrator, ends if not
+* DEPLOY.cmd - enables powershell scripts execution on that windows PC
+* DEPLOY.cmd - creates directory C:\Scripts if it does not existing
+* DEPLOY.cmd - copies / overwrites-if-newer veeam_prometheus_info_push.ps1 in to C:\Scripts
+* DEPLOY.cmd - imports taskscheduler xml task named veeam_prometheus_info_push
 * TASKSCHEDULER - the task executes every hour with random delay of 30 seconds
 * TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
 
