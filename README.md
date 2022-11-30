@@ -208,6 +208,9 @@ scrape_configs:
 
 </details>
 
+---
+---
+
 <details>
 <summary><h1>Learning in small steps</h1></summary>
 
@@ -278,7 +281,6 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 </details>
 
----
 ---
 ---
 
@@ -385,14 +387,14 @@ WantedBy=timers.target
 
 ![pic_prometheus](https://i.imgur.com/YzNWZQb.png)
 
-Not much really to do once it runs.Checking values and delete them I guess.<br>
+Not much really to do once it runs. Checking values and delete them I guess.<br>
 You can access its web interface from LAN side with `<dockerhost>:9090`, or
 you can setup web access to it from the outside if you wish.
 Same process as with pushgateway or any other webserver accessible through caddy.
 
 [Official documentation on queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 
-To query something just write plain metrics value, like `veeam_job_result`.
+To query something just write plain metrics name, like `veeam_job_result`.
 But in the table tab it shows you by default only the result from a recent
 time window. You can switch to what date you want query too apply,
 or switch to graph view and set range to few weeks.
