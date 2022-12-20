@@ -258,6 +258,8 @@ Heres how the data look in prometheus when executing `free_disk_space` query
 
 The labels help us target the data in grafana.
 
+### first dashobard
+
 * create **new dashboard**, panel
 * switch type to **Status history**
 * select metric - `free_disk_space`
