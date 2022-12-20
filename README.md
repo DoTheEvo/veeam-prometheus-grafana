@@ -22,9 +22,9 @@ https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Grafana](https://grafana.com/)
 
 A powershell script periodicly runs on machines running Veeam,
-gathering information about the backup-jobs using Get-VBRJob cmdlet.<br>
-This info gets pushed to a prometheus pushgateway.<br>
-Grafana dashboard then visualizes the information.
+gathering information about the backup-jobs using Get-VBRJob cmdlet.
+This info gets pushed to a prometheus pushgateway, where it get scraped
+in to prometheus. Grafana dashboard then visualizes the gathered information.
 
 ![dashboard_pic](https://i.imgur.com/hek3Y7D.png)
 
@@ -36,7 +36,7 @@ Components
 * scheduled task running powershell script on these machines<br>
   this script is likely the weakest link,
   the least reliable component of the setup
-* a dockerhost running container
+* a dockerhost running containers:
   * promethus
   * pushgateway
   * grafana
@@ -245,17 +245,18 @@ Invoke-RestMethod `
     -Body $body
 ```
 
-* in the $body we have name of the metrics - `free_disk_space`
-* in the url we have two labels, `job=veeam_report` and `instance=PC1`<br>
-  note the url pattern after `10.0.19.4:9091/metrics/`
-  its name of label and value of label, name of label, value of label,...
-  also these things don't have to be named `job` and `instance`
+* in the $body we have name of the metrics - `free_disk_space`<br>
+  and the value of that metrics - `32`<br>
+* in the url, after `10.0.19.4:9091/metrics/`, we have two labels defined<br>
+ `job=veeam_report` and `instance=PC1`<br>
+  note the pattern, name of a label and value of it, they always must be in pair.
+  They can be named whatever, but `job` and `instance` are customary
 
 Heres how the data look in prometheus when executing `free_disk_space` query
 
 ![first_put](https://i.imgur.com/9G0QcuT.png)
 
-The metrics and labels help us target the data in grafana.
+The labels help us target the data in grafana.
 
 * create **new dashboard**, panel
 * switch type to **Status history**

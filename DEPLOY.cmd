@@ -1,11 +1,6 @@
-:: allows powershell scripts
-:: copies ps1 script file to c:\Scripts
-:: creates scheduled task to execute every hour
-
 @echo off
 
-:: check if the script is run as administrator
-
+:: checking if the script is run as administrator
 net session >nul 2>&1
 if %errorLevel% == 0 (
     echo - Success: Administrative permissions confirmed.
@@ -22,7 +17,7 @@ echo - copying veeam_prometheus_info_push.ps1 in to C:\Scripts\
 if not exist "C:\Scripts\" mkdir C:\Scripts
 robocopy "%~dp0\" "C:\Scripts" "veeam_prometheus_info_push.ps1" /NDL /NJH /NJS
 
-:: import scheduled task, will not overwrite
+:: importing scheduled task, will not overwrite
 :: delete the task in taskschd.msc if you want fresh import
 
 if exist C:\Windows\System32\Tasks\veeam_prometheus_info_push (
