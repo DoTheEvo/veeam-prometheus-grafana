@@ -10,6 +10,15 @@
 **WORK IN PROGRESS**<br>
 **WORK IN PROGRESS**
 
+FUck, gonna have to learn more on backup sessions types - 
+`windows agen policy` vs `windows agent backup`
+
+cuz what [can happen](https://i.imgur.com/xuIPQaT.png) is that last session job
+returned info is on that short little policy shit and the actual backup
+can be failing and dashboard would be unaware.<br>
+One way to never deal with this is picking Managed by backup server instead of 
+Managed by agent...
+
 ---------------
 
 # Purpose
@@ -86,7 +95,7 @@ services:
 
   # MONITORING SYSTEM AND THE METRICS DATABASE
   prometheus:
-    image: prom/prometheus:v2.39.1
+    image: prom/prometheus:v2.41.0
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -107,7 +116,7 @@ services:
 
   # WEB BASED UI VISUALISATION OF THE METRICS
   grafana:
-    image: grafana/grafana:9.2.3
+    image: grafana/grafana:9.3.2
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -121,7 +130,7 @@ services:
       - 3000:3000
 
   pushgateway:
-    image: prom/pushgateway:v1.4.3
+    image: prom/pushgateway:v1.5.1
     container_name: pushgateway
     hostname: pushgateway
     restart: unless-stopped
@@ -192,7 +201,7 @@ global:
 
 # A scrape configuration containing exactly one endpoint to scrape.
 scrape_configs:
-  - job_name: 'pushgateway'
+  - job_name: 'pushgateway-scrape'
     scrape_interval: 60s
     honor_labels: true
     static_configs:
@@ -205,6 +214,8 @@ scrape_configs:
 * in Preferences > Datasources set `http://prometheus:9090` for url<br>
   save and test should be green<br>
 * once some values are pushed to prometheus, create a new dashboard...
+
+![prometheus_working_pic_confirmation](https://i.imgur.com/aFKtSTe.png)
 
 </details>
 
@@ -223,6 +234,7 @@ what should work at this moment
 ### testing how to push data to pushgateway
 
 * metrics must be floats
+* naming [convention](https://prometheus.io/docs/practices/naming/) is to end the metric names with units
 * for strings, labels passed in url are used 
 
 Prometheus requires linux [line endings.](
@@ -237,7 +249,7 @@ This is not related to the previous issue of line endings.
 
 `test.ps1`
 ```ps1
-$body = "free_disk_space 32`n"
+$body = "storage_diskC_free_space_bytes 32`n"
 
 Invoke-RestMethod `
     -Method PUT `
@@ -245,14 +257,14 @@ Invoke-RestMethod `
     -Body $body
 ```
 
-* in the $body we have name of the metrics - `free_disk_space`<br>
+* in the $body we have name of the metrics - `storage_diskC_free_space_bytes`<br>
   and the value of that metrics - `32`<br>
 * in the url, after `10.0.19.4:9091/metrics/`, we have two labels defined<br>
  `job=veeam_report` and `instance=PC1`<br>
   note the pattern, name of a label and value of it, they always must be in pair.
   They can be named whatever, but `job` and `instance` are customary
 
-Heres how the data look in prometheus when executing `free_disk_space` query
+Heres how the data look in prometheus when executing `storage_diskC_free_space_bytes` query
 
 ![first_put](https://i.imgur.com/9G0QcuT.png)
 
@@ -262,7 +274,7 @@ The labels help us target the data in grafana.
 
 * create **new dashboard**, panel
 * switch type to **Status history**
-* select metric - `free_disk_space`
+* select metric - `storage_diskC_free_space_bytes`
 * [query options](https://grafana.com/docs/grafana/next/panels-visualizations/query-transform-data/#query-options)
   * min interval - 1h
   * relative time - now-10h/h
