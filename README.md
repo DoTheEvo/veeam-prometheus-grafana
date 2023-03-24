@@ -191,7 +191,12 @@ push.{$MY_DOMAIN} {
 
 [Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
 
-A config file for prometheus, bind mounted in to prometheus container.</br>
+A config file for prometheus, bind mounted in to prometheus container.
+
+Of note is
+**honor_labels** set [to true,](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config)
+which makes sure that **conflicting labels**, like `job` label, set during push
+is kept over label set in `prometheus.yml` for the scrape job.
 
 `prometheus.yml`
 ```yml
