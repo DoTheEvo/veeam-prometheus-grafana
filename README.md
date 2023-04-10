@@ -533,7 +533,7 @@ The third panel is a table with general jobs info.
 * Query, switch from builder to code
   `veeam_job_result_info{job="veeam_report"}`
   * Query options > Format = Table<br>
-  * Query options > Type = Instant<br>
+  * Query options > Type = Instant (query button press to show change)
 * This results in a table where each job's last result is shown,
   plus labels and their values.<br>
   One could start cleaning it up with a Transform,
@@ -566,7 +566,8 @@ The third panel is a table with general jobs info.
   * Reorder with drag and drop
 * Now to tweak how it all looks and show readable values
 * Panel options > Title = empty
-* Table > Cell display mode = Color background (gradient)<br>
+* Table > Cell Options > Colored background
+* Table > Cell Options > Background display mode = Gradient<br>
   Ignore for now all the colors.
 * Standard options > Unit = `seconds (s)`; Decimals = 0<br>
   This makes the three time columns readable.
