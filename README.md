@@ -583,16 +583,6 @@ The third panel is a table with general jobs info.
   * group name; some color with some transparency to not be too loud
   * group name; some color with some transparency to not be too loud
 
------
-
-deletion of all data on prometheus and on pushgateway
-
-its useful for learning, but requires opening API in the compose file
-so if not in use remove lines containing `- '--web.enable-admin-api'`
-      
-* `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
-* `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
-
 ----
 
 # googled out shit
