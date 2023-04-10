@@ -41,7 +41,7 @@ in to prometheus. Grafana **dashboard** then visualizes the gathered information
 
 There are several types of jobs in VBR
 
-* Virtual Machine backup - Hyper-V / Vmware
+* Virtual Machine backup - Hyper-V / VMware
 * File Backup - for network shares
 * Agent Backup - for physical windows machine 
   * Managed by a server (agent still does the work) 
@@ -51,11 +51,15 @@ To gather data with powershell `Get-VBRJob` works, but since v10 of VBR
 the developers dont want people to use it for agent base backups.<br>
 For those the `Get-VBRComputerBackupJob` should be used.
 
+....its unfinished here...
+
 Get-VBRJob
+
 Get-VBRComputerBackupJob
+
 Get-VBRNASBackup
 
-$jobs = Get-VBRJob -WarningAction SilentlyContinue | where {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' -and $_.BackupPlatform.Platform -ne 'EEndPoint'}
+`$jobs = Get-VBRJob -WarningAction SilentlyContinue | where {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' -and $_.BackupPlatform.Platform -ne 'EEndPoint'}`
 
 <details>
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
@@ -68,17 +72,17 @@ $jobs = Get-VBRJob -WarningAction SilentlyContinue | where {$_.BackupPlatform.Pl
     └── docker/
         └── prometheus/
             │
-            ├── grafana/
-            ├── grafana-data/
-            ├── prometheus-data/
-            ├── .env
-            ├── docker-compose.yml
-            └── prometheus.yml
+            ├── 🗁 grafana/
+            ├── 🗁 grafana_data/
+            ├── 🗁 prometheus_data/
+            ├── 🗋 .env
+            ├── 🗋 docker-compose.yml
+            └── 🗋 prometheus.yml
 ```
 
 * `grafana/` - a directory containing grafanas configs and dashboards
-* `grafana-data/` - a directory where grafana stores its data
-* `prometheus-data/` - a directory where prometheus stores its database and data
+* `grafana_data/` - a directory where grafana stores its data
+* `prometheus_data/` - a directory where prometheus stores its database and data
 * `.env` - a file containing environment variables for docker compose
 * `docker-compose.yml` - a docker compose file, telling docker how to run the containers
 * `prometheus.yml` - a configuration file for prometheus
@@ -91,9 +95,12 @@ The directories are created by docker compose on the first run.
 Three containers to spin up.</br>
 
 * **Prometheus** - prometheus server, pulling, storing, evaluating metrics
-* **Pushgateway** - service ready to receive pushed information at an open port
-* **Grafana** - web UI visualization of the collected metrics
-  in nice dashboards
+* **Pushgateway** - web server ready to receive pushed information at an open port
+* **Grafana** - web UI visualization of the collected metrics in nice dashboards
+
+Ports are actually mapped to the docker host, to be able to easily access
+these by docker-host-ip and port. But if reverse proxy like caddy is used and 
+subdomains setup, then `ports` section can be removed or replaced by `expose`.
 
 `docker-compose.yml`
 ```yml
@@ -101,7 +108,7 @@ services:
 
   # MONITORING SYSTEM AND THE METRICS DATABASE
   prometheus:
-    image: prom/prometheus:v2.41.0
+    image: prom/prometheus:v2.43.0
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -118,11 +125,11 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus_data:/prometheus
     ports:
-      - 9090:9090
+      - "9090:9090"
 
   # WEB BASED UI VISUALISATION OF THE METRICS
   grafana:
-    image: grafana/grafana:9.3.2
+    image: grafana/grafana:9.4.7
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -133,7 +140,7 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
     ports:
-      - 3000:3000
+      - "3000:3000"
 
   pushgateway:
     image: prom/pushgateway:v1.5.1
@@ -143,7 +150,7 @@ services:
     command:
       - '--web.enable-admin-api'    
     ports:
-      - 9091:9091
+      - "9091:9091"
 
 networks:
   default:
@@ -155,7 +162,6 @@ networks:
 
 ```bash
 # GENERAL
-MY_DOMAIN=example.com
 DOCKER_MY_NETWORK=caddy_net
 TZ=Europe/Bratislava
 
@@ -164,7 +170,7 @@ GF_SECURITY_ADMIN_USER=admin
 GF_SECURITY_ADMIN_PASSWORD=admin
 GF_USERS_ALLOW_SIGN_UP=false
 
-# DATE FORMATS SWITCHED TO THEN NAMES OF THE DAYS OF THE WEEK
+# DATE FORMATS SWITCHED TO NAMES OF THE DAYS OF THE WEEK
 #GF_DATE_FORMATS_INTERVAL_HOUR = dddd
 #GF_DATE_FORMATS_INTERVAL_DAY = dddd
 ```
@@ -594,4 +600,4 @@ so if not in use remove lines containing `- '--web.enable-admin-api'`
 # googled out shit
 
 * [get repository total size and free size](https://forums.veeam.com/powershell-f26/v11-get-vbrbackuprepository-space-properties-t72415.html)
-*
+* https://www.reddit.com/r/Veeam/comments/12a15cu/useful_veeam_toolsscripts/
