@@ -32,10 +32,10 @@ https://www.veeam.com/virtual-machine-backup-solution-free.html)
 
 A **powershell script** periodically runs on machines running VBR,
 gathering information about the backup-jobs using powershell **cmdlets**.
-This info gets pushed to a **prometheus pushgateway**, where it get scraped
+This info gets pushed to a **prometheus pushgateway**, where it gets scraped
 in to prometheus. Grafana **dashboard** then visualizes the gathered information.
 
-![dashboard_pic](https://i.imgur.com/hek3Y7D.png)
+![dashboard_pic](https://i.imgur.com/4eW1dJh.png)
 
 # Basic info on Veeam Backup & Replication
 
@@ -64,15 +64,17 @@ Get-VBRNASBackup
 <details>
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
 
+[Here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/prometheus_grafana_loki)
+is separate universal guide-by-example for monitoring docker containers with
+Prometheus Grafana Loki. Might be useful too.
+
 # Files and directory structure
 
 ```
 /home/
 └── ~/
     └── docker/
-        └── prometheus/
-            │
-            ├── 🗁 grafana/
+        └── veeam_monitoring/
             ├── 🗁 grafana_data/
             ├── 🗁 prometheus_data/
             ├── 🗋 .env
@@ -95,8 +97,8 @@ The directories are created by docker compose on the first run.
 Three containers to spin up.</br>
 
 * **Prometheus** - prometheus server, pulling, storing, evaluating metrics
-* **Pushgateway** - web server ready to receive pushed information at an open port
-* **Grafana** - web UI visualization of the collected metrics in nice dashboards
+* **Pushgateway** - web server ready to receive pushed information on an open port
+* **Grafana** - web GUI visualization of the collected metrics in nice dashboards
 
 Ports are actually mapped to the docker host, to be able to easily access
 these by docker-host-ip and port. But if reverse proxy like caddy is used and 
@@ -137,8 +139,6 @@ services:
     user: root
     volumes:
       - ./grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
     ports:
       - "3000:3000"
 
@@ -199,8 +199,6 @@ push.{$MY_DOMAIN} {
 
 #### prometheus.yml
 
-* /prometheus/**prometheus.yml**
-
 [Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
 
 A config file for prometheus, bind mounted in to prometheus container.
@@ -216,7 +214,6 @@ global:
   scrape_interval:     15s
   evaluation_interval: 15s
 
-# A scrape configuration containing exactly one endpoint to scrape.
 scrape_configs:
   - job_name: 'pushgateway-scrape'
     scrape_interval: 60s
@@ -380,7 +377,8 @@ Ideally one uses a subdomain and https for pushgateway, for that:
 * caddy runs as reverse proxy, means it is completely in charge of traffic
   coming on 80 and 443.<br>
   The rule from the reverse proxy section in this Readme applies,
-  so if something comes at `push.example.com` it gets redirected to <dockerhost>:9091
+  so if something comes at `push.example.com` it gets redirected to
+  container named pushgateway and port 9091.
 * the `$base_url` in the script is `https://push.example.com`
 * the script contains a line at the begging to switch to TLS 1.2 from powershells
   default 1.0
@@ -402,7 +400,7 @@ there might be some benefit to daily wiping pushgateway clean.
 For this the dockerhost can have a simple systemd service and timer.
 
 `pushgateway_wipe.service`
-```INI
+```ini
 [Unit]
 Description=wipe clean prometheus pushgateway
 
@@ -412,7 +410,7 @@ ExecStart=curl -X PUT https://push.example.com/api/v1/admin/wipe
 ```
 
 `pushgateway_wipe.timer`
-```INI
+```ini
 [Unit]
 Description=wipe clean prometheus pushgateway
  
