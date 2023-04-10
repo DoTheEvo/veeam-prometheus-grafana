@@ -86,7 +86,7 @@ if ($LastSession.Info.BackupTotalSize) {
 # ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
 # THE EMPTY LINE IS REQUIRED
 $body = @"
-veeam_job_result $LastJobResultCode
+veeam_job_result_info $LastJobResultCode
 veeam_job_start_time_seconds $StartTimeLocalEpoch
 veeam_job_end_time_seconds $StopTimeLocalEpoch
 veeam_job_duration_seconds $DurationInSeconds

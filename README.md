@@ -108,7 +108,6 @@ subdomains setup, then `ports` section can be removed or replaced by `expose`.
 ```yml
 services:
 
-  # MONITORING SYSTEM AND THE METRICS DATABASE
   prometheus:
     image: prom/prometheus:v2.43.0
     container_name: prometheus
@@ -129,7 +128,6 @@ services:
     ports:
       - "9090:9090"
 
-  # WEB BASED UI VISUALISATION OF THE METRICS
   grafana:
     image: grafana/grafana:9.4.7
     container_name: grafana
@@ -438,14 +436,14 @@ Same process as with pushgateway or any other webserver accessible through caddy
 
 [Official documentation on queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 
-To query something just write plain metrics name, like `veeam_job_result`.
+To query something just write plain metrics name, like `veeam_job_result_info`.
 But in the table tab it shows you by default only the result from a recent
 time window. You can switch to what date you want query too apply,
 or switch to graph view and set range to few weeks.
 
 More targeted query, with the use of regex, signified by `=~`
 
-  * `veeam_job_result{instance=~"Backup Copy Job.*"}`
+  * `veeam_job_result_info{instance=~"Backup Copy Job.*"}`
 
 To delete all metrics on prometheus
 
@@ -462,12 +460,15 @@ Theres no white space in the query, so dots are used.
 
 ![panel-status-history](https://i.imgur.com/gO6CW7i.png)
 
+Might be bit difficult to make the dashboard right away with too little data
+on Prometheus yet. Use small time ranges.
+
 The first panel is for seeing last X days backup history, at quick glance
 
 * Visualization = Status history
 * Data source = Prometheus
 * Query, switch from builder to code
-  `veeam_job_result{job="veeam_report"}`
+  `veeam_job_result_info{job="veeam_report"}`
 * Query options > Min interval = 1h<br>
   this value sets the "resolution" of status history panel,
   but the push by default is happening only every hour.
@@ -530,7 +531,7 @@ The third panel is a table with general jobs info.
 * Visualization = Table
 * Data source = Prometheus
 * Query, switch from builder to code
-  `veeam_job_result{job="veeam_report"}`
+  `veeam_job_result_info{job="veeam_report"}`
   * Query options > Format = Table<br>
   * Query options > Type = Instant<br>
 * This results in a table where each job's last result is shown,
@@ -547,11 +548,11 @@ The third panel is a table with general jobs info.
   the second is the query code itself.<br>
   Every query Options are set to **table** and **instant**.
   * `total_size`<br>
-    `veeam_job_totalsize{job="veeam_report"}`
+    `veeam_job_totalsize_bytes{job="veeam_report"}`
   * `job_runtime`<br>
-    `veeam_job_duration{job="veeam_report"}`
+    `veeam_job_duration_seconds{job="veeam_report"}`
   * `last_job_run`<br>
-    `round(time()-veeam_job_end_time{job="veeam_report"})`
+    `round(time()-veeam_job_end_time_seconds{job="veeam_report"})`
   * `last_report`<br>
     `round(time()-push_time_seconds{job="veeam_report"})`
 * Now the result is that there are 5 tables, switchable from a drop down menu,
