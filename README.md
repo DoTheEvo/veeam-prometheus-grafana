@@ -11,45 +11,51 @@
 **WORK IN PROGRESS**
 
 FUck, gonna have to learn more on backup sessions types - 
-`windows agen policy` vs `windows agent backup`
+`windows agent policy` vs `windows agent backup`
 
 cuz what [can happen](https://i.imgur.com/xuIPQaT.png) is that last session job
 returned info is on that short little policy shit and the actual backup
 can be failing and dashboard would be unaware.<br>
-One way to never deal with this is picking Managed by backup server instead of 
-Managed by agent...
+Still learning that all non-nas and non-vms backups are agent based.
+No matter if server or agent decides, theres still an agent.
 
 ---------------
 
 # Purpose
 
-Centralized monitoring dashboard for Veeam B&R community edition backup jobs.
+Centralized **monitoring dashboard** for Veeam B&R community edition backups.<br>
 
 * [Veeam Backup & Replication Community Edition](
 https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Prometheus](https://prometheus.io/)
 * [Grafana](https://grafana.com/)
 
-A powershell script periodicly runs on machines running Veeam,
-gathering information about the backup-jobs using Get-VBRJob cmdlet.
-This info gets pushed to a prometheus pushgateway, where it get scraped
-in to prometheus. Grafana dashboard then visualizes the gathered information.
+A **powershell script** periodically runs on machines running VBR,
+gathering information about the backup-jobs using powershell **cmdlets**.
+This info gets pushed to a **prometheus pushgateway**, where it get scraped
+in to prometheus. Grafana **dashboard** then visualizes the gathered information.
 
 ![dashboard_pic](https://i.imgur.com/hek3Y7D.png)
 
-# Overview
+# Basic info on Veeam Backup & Replication
 
-Components
+There are several types of jobs in VBR
 
-* machines running Veeam B&R
-* scheduled task running powershell script on these machines<br>
-  this script is likely the weakest link,
-  the least reliable component of the setup
-* a dockerhost running containers:
-  * promethus
-  * pushgateway
-  * grafana
-  * alertmanager ... to-do 
+* Virtual Machine backup - Hyper-V / Vmware
+* File Backup - for network shares
+* Agent Backup - for physical windows machine 
+  * Managed by a server (agent still does the work) 
+  * Managed by an agent
+
+To gather data with powershell `Get-VBRJob` works, but since v10 of VBR
+the developers dont want people to use it for agent base backups.<br>
+For those the `Get-VBRComputerBackupJob` should be used.
+
+Get-VBRJob
+Get-VBRComputerBackupJob
+Get-VBRNASBackup
+
+$jobs = Get-VBRJob -WarningAction SilentlyContinue | where {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' -and $_.BackupPlatform.Platform -ne 'EEndPoint'}
 
 <details>
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
@@ -236,11 +242,19 @@ what should work at this moment
 * \<docker-host-ip>:9090 - prometheus 
 * \<docker-host-ip>:9091 - pushgateway 
 
-### testing how to push data to pushgateway
+### learning and testing how to push data to pushgateway
 
 * metrics must be floats
-* naming [convention](https://prometheus.io/docs/practices/naming/) is to end the metric names with units
-* for strings, labels passed in url are used 
+* naming [convention](https://prometheus.io/docs/practices/naming/)
+  is to end the metric names with units
+* labels are used to pass strings in the url
+* The idea what
+ [job and instance](https://prometheus.io/docs/concepts/jobs_instances/) represent.
+  In pushgateway I guess the job is still just overal main idea
+  and instance is about final undivisable target. Final in sense that if taking disk
+  usage data, do you put computer name as instance which can have multiple disk,
+  or the disk themselves as instance? IMO the disk..
+
 
 Prometheus requires linux [line endings.](
 https://github.com/prometheus/pushgateway/issues/144)<br>
@@ -308,29 +322,18 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
-Windows by default does not allow execution of powershell scripts,
-got to `Set-ExecutionPolicy RemoteSigned` in powershell console.
+The script should be pretty readable with the comments in it.
 
-Veeam offers [many cmdlets](https://helpcenter.veeam.com/docs/backup/powershell/cmdlets.html) to use with B&R installation.
+Of note are the results codes for backup jobs
 
-* [Get-VBRJob](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrjob.html)<br>
-  is the only one used in the script. Not all info for all type of jobs is available.
-  But enough for dashboard to visualize current status.
-* [Get-VBRBackup](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackup.html)<br>
-  not used, but played with to get better size and repository info,
-  but does not seem to work very well for many jobs
-* [Get-VBRBackupSession](https://helpcenter.veeam.com/docs/backup/powershell/get-vbrbackupsession.html)<br>
-  not used, but played with to get better info on why job ended with warning or fail
+* 0 = success
+* 1 = warning
+* 2 = failed
+* -1 =  running
+* -2 = disabled or not scheduled<br>
+  unlike the rest that come from veeam, this one is manually checked and set
 
-The script itself is pretty readable and comes with comments.
-
-It started being pretty clean.
-But with actual use there were errors and missing backups when values queried were null.
-And so the script becomes more cluttered with checks if data exists when querying.<br>
-Ideally more work should be done on this data validation for better reliability,
-to really check every single queried value... but maybe later...  
-
-### DEPLOY.cmd file
+#### DEPLOY.cmd file
 
 The file that eases the installation process
 
@@ -346,10 +349,20 @@ What happens under the hood:
 * DEPLOY.cmd - checks if its run as administrator, ends if not
 * DEPLOY.cmd - enables powershell scripts execution on that windows PC
 * DEPLOY.cmd - creates directory C:\Scripts if it does not existing
-* DEPLOY.cmd - copies / overwrites-if-newer veeam_prometheus_info_push.ps1 in to C:\Scripts
+* DEPLOY.cmd - checks if the script already exists, if it does
+               renames it with random suffix
+* DEPLOY.cmd - copies veeam_prometheus_info_push.ps1 in to C:\Scripts
 * DEPLOY.cmd - imports taskscheduler xml task named veeam_prometheus_info_push
 * TASKSCHEDULER - the task executes every hour with random delay of 30 seconds
 * TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
+
+### Script Change log
+
+* v0.2
+  * added pushing of repository disk usage info
+  * changed metrics name to include units
+  * general cleanup
+* v0.1 - the initial script
 
 # Pushgateway
 
@@ -441,50 +454,130 @@ To delete metrics based off instance or group
 
 Theres no white space in the query, so dots are used.
 
-# Grafana dashboads
+# Grafana dashboard
 
-![panel-status-history](https://i.imgur.com/okwj9hJ.png)
+![panel-status-history](https://i.imgur.com/gO6CW7i.png)
 
-First panel is for seeing last X days and result of backups, at quick glance
+The first panel is for seeing last X days backup history, at quick glance
 
-* new dashboard > new panel
-* status history
-* select labels job = veeam_report; select metric - veeam_job_result
-* query options - min interval 1m, or 10m, or 1h, or 1d<br>
-  this value sets the size of rectangle in status history panel
-* transform - regex by name - `.+instance="([^"]*).*`
-* panel title - Veeam History
-* status history > show values - never
-* Value mapping and Thresholds
-  * 0 - green - Successful
-  * 1 - yellow - Warning
-  * 2 - red - Failed
-  * -1 - blue - running
-  * -2 - black - Disabled | Unscheduled
+* Visualization = Status history
+* Data source = Prometheus
+* Query, switch from builder to code
+  `veeam_job_result{job="veeam_report"}`
+* Query options > Min interval = 1h<br>
+  this value sets the "resolution" of status history panel,
+  but the push by default is happening only every hour.
+* two ways to have nice labels
+  * Query > Options > Legend > switch from `Auto` to `Custom`<br>
+    Legend = `{{instance}} | {{group}}`
+  * Transform > Rename by regex<br>
+    Match = `.+group="([^"]*).+instance="([^"]*).*`<br>
+    Replace = `$2 | $1`
+* Panel > title = Veeam History
+* Status history > Show values = never
+* Legend > Visibility = off
+* Value mapping
+  * 0 = Successful; Green
+  * 1 = Warning; Yellow
+  * 2 = Failed; Red
+  * -1 = Running; Blue
+  * -2 = Disabled | Unscheduled; Grey
 
-![panel-table](https://i.imgur.com/THUmrWq.png)
+---
 
-Second panel is with more info, the most important is "Last Report"
+![disk-use](https://i.imgur.com/9hNGx9K.png)
 
-* new panel
-* table
-* select labels job = veeam_report; select metric - push_time_seconds<br>
-  switch from builder to code and `round(time()-push_time_seconds{job="veeam_report"})`<br>
-* options - format - table; type - instant;  
-* rename query from $A to push_time_seconds
-* new query
-* select labels job = veeam_report; select metric - veeam_job_duration
-* options - format - table; type - instant
-* rename query from $A to veeam_job_duration
-* new query
-* select labels job = veeam_report; select metric - veeam_job_totalsize
-* options - format - table; type - instant;
-* rename query from $A to veeam_job_totalsize
-* transform - outer join - field name = instance
-* transform - organize fields - hide time and any other useless columns, rename headers
-* table - standard options - units - seconds; decimals - 0
-* override - fields with names - size - standard option - units - bytes(SI)
+The second panel is to get info how full repositories are.<br>
+Surprisingly grafana is not as capable as I hoped.
+While their example
+[shows](https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-gauge/)
+exactly what I wanted, they cheated by picking the same max value for all disks.<br>
+So unfortunately no nice GB and TB info, just percent.<br>
+Tried to [float](https://github.com/grafana/grafana/discussions/66159)
+the idea of fixing this in their discussion on github.
 
+* Visualization = Bar gauge
+* Data source = Prometheus
+* Query, switch from builder to code
+  ```
+  (veeam_repo_total_size_bytes{job="veeam_report_repo"}
+  - veeam_repo_free_space_bytes{job="veeam_report_repo"})
+  / ((veeam_repo_total_size_bytes{job="veeam_report_repo"}) /100)
+  ```
+* Query > Options > Legend > switch from `Auto` to `Custom`<br>
+  Legend = ` {{group}} - {{instance}} - {{server}}`
+* Panel > title = Repositories Disks Usage
+* Bar gauge > Display mode > Basic
+* Standard options > Unit = Misc > Percent (0-100)
+* Standard options > Min = 0
+* Standard options > Max = 100
+* Standard options > Decimals = 0
+* Thresholds
+  * 90 = red
+  * 75 = Yellow
+  * base = green
+
+---  
+
+![panel-table](https://i.imgur.com/rBU2cJq.png)
+
+The third panel is a table with general jobs info.
+
+* Visualization = Table
+* Data source = Prometheus
+* Query, switch from builder to code
+  `veeam_job_result{job="veeam_report"}`
+  * Query options > Format = Table<br>
+  * Query options > Type = Instant<br>
+* This results in a table where each job's last result is shown,
+  plus labels and their values.<br>
+  One could start cleaning it up with a Transform,
+  but there are other metrics missing and the time stuff is in absolute values
+  instead of X minutes/hours ago.
+* So before cleaning much more mess will be added.
+* [Rename](https://i.imgur.com/fOGGyW1.gif) the original query
+  from `A` to `result`.<br>
+  This renaming will be used in all following queries so that the fields
+  are distinguishable in transformation later.
+* Create following queries, the first line is the new name,
+  the second is the query code itself.<br>
+  Every query Options are set to **table** and **instant**.
+  * `total_size`<br>
+    `veeam_job_totalsize{job="veeam_report"}`
+  * `job_runtime`<br>
+    `veeam_job_duration{job="veeam_report"}`
+  * `last_job_run`<br>
+    `round(time()-veeam_job_end_time{job="veeam_report"})`
+  * `last_report`<br>
+    `round(time()-push_time_seconds{job="veeam_report"})`
+* Now the result is that there are 5 tables, switchable from a drop down menu,
+  But they need to be combined in to one table.
+* Transform > Join by field > Mode = OUTER; Field = instance
+* Now theres one long table with lot of duplication as every query brought 
+  labels again. Now to clean it up.
+* Transform > Organize fields
+  * Hide unwanted fields, rename headers for fields that are kept
+  * Hiding anything with number 2, 3, 4, 5 in name works to get bulk of it gone
+  * Reorder with drag and drop
+* Now to tweak how it all looks and show readable values
+* Panel options > Title = empty
+* Table > Cell display mode = Color background (gradient)<br>
+  Ignore for now all the colors.
+* Standard options > Unit = `seconds (s)`; Decimals = 0<br>
+  This makes the three time columns readable.
+* Thresholds > delete whatever is there; edit Base to be transparent
+* Overrides > Fields with name = Total Size > Add override property >
+  Standard options > Unit = bytes(SI)
+* Overrides > Fields with name = Result > Value mappings
+  * 0 = Successful; Green
+  * 1 = Warning; Yellow
+  * 2 = Failed; Red
+  * -1 = Running; Blue
+  * -2 = Disabled | Unscheduled; Grey
+* Overrides > Fields with name = Group > Value mappings
+  * group name; some color with some transparency to not be too loud
+  * group name; some color with some transparency to not be too loud
+  * group name; some color with some transparency to not be too loud
 
 -----
 
@@ -496,3 +589,9 @@ so if not in use remove lines containing `- '--web.enable-admin-api'`
 * `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
 * `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 
+----
+
+# googled out shit
+
+* [get repository total size and free size](https://forums.veeam.com/powershell-f26/v11-get-vbrbackuprepository-space-properties-t72415.html)
+*
