@@ -24,6 +24,7 @@ No matter if server or agent decides, theres still an agent.
 # Purpose
 
 Centralized **monitoring dashboard** for Veeam B&R community edition backups.<br>
+Though relatively easily adjusted to any backup solution.
 
 * [Veeam Backup & Replication Community Edition](
 https://www.veeam.com/virtual-machine-backup-solution-free.html)
