@@ -552,7 +552,7 @@ The third panel is a table with general jobs info.
   * `job_runtime`<br>
     `veeam_job_duration_seconds{job="veeam_report"}`
   * `last_job_run`<br>
-    `round(time()-veeam_job_end_time_seconds{job="veeam_report"})`
+    `round(time()-veeam_job_end_time_timestamp_seconds{job="veeam_report"})`
   * `last_report`<br>
     `round(time()-push_time_seconds{job="veeam_report"})`
 * Now the result is that there are 5 tables, switchable from a drop down menu,

@@ -87,8 +87,8 @@ if ($LastSession.Info.BackupTotalSize) {
 # THE EMPTY LINE IS REQUIRED
 $body = @"
 veeam_job_result_info $LastJobResultCode
-veeam_job_start_time_seconds $StartTimeLocalEpoch
-veeam_job_end_time_seconds $StopTimeLocalEpoch
+veeam_job_start_time_timestamp_seconds $StartTimeLocalEpoch
+veeam_job_end_time_timestamp_seconds $StopTimeLocalEpoch
 veeam_job_duration_seconds $DurationInSeconds
 veeam_job_totalsize_bytes $TotalSize
 
