@@ -371,16 +371,14 @@ What happens under the hood:
 
 Ideally one uses a subdomain and https for pushgateway, for that:
 
-* have subdomain `push.example.com` and DNS record aiming at the servers public IP
-* caddy runs as reverse proxy, means it is completely in charge of traffic
-  coming on 80 and 443.<br>
+* Have subdomain `push.example.com` and DNS record aiming at the servers public IP
+* Use [caddy](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/caddy_v2)
+  as a reverse proxy. It is completely in charge of traffic coming on 80 and 443.<br>
   The rule from the reverse proxy section in this Readme applies,
   so if something comes at `push.example.com` it gets redirected to
   container named pushgateway and port 9091.
-* the `$base_url` in the script is `https://push.example.com`
-* the script contains a line at the begging to switch to TLS 1.2 from powershells
-  default 1.0
-* should now work
+* The `$base_url` in the script is `https://push.example.com`
+* Should now work.
 
 To delete all data from pushgateway
 
