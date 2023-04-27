@@ -2,7 +2,7 @@
 
 ###### guide-by-example
 
-![logo](https://i.imgur.com/xScE6fL.png)
+![logo](https://i.imgur.com/EEExOB0.png)
 
 -----------------
 
@@ -13,7 +13,7 @@
 FUck, gonna have to learn more on backup sessions types - 
 `windows agent policy` vs `windows agent backup`
 
-cuz what [can happen](https://i.imgur.com/xuIPQaT.png) is that last session job
+cuz what [can happen](https://i.imgur.com/0aAvHuM.png) is that last session job
 returned info is on that short little policy shit and the actual backup
 can be failing and dashboard would be unaware.<br>
 Still learning that all non-nas and non-vms backups are agent based.
@@ -36,7 +36,7 @@ gathering information about the backup-jobs using powershell **cmdlets**.
 This info gets pushed to a **prometheus pushgateway**, where it gets scraped
 in to prometheus. Grafana **dashboard** then visualizes the gathered information.
 
-![dashboard_pic](https://i.imgur.com/4eW1dJh.png)
+![dashboard_pic](https://i.imgur.com/pRuYTQF.png)
 
 # Basic info on Veeam Backup & Replication
 
@@ -44,15 +44,37 @@ There are several types of jobs in VBR
 
 * Virtual Machine backup - Hyper-V / VMware
 * File Backup - for network shares
-* Agent Backup - for physical windows machine 
-  * Managed by a server (agent still does the work) 
-  * Managed by an agent
+* Agent Backup - for physical machines 
+  * Managed by a server, agent does the work
+  * Managed by agent, not a backup job but a **backup policy**
+
+### Backup policy
+
+* [Official documentation](https://helpcenter.veeam.com/docs/backup/agents/agents_policy.html?ver=120)
+
+Intended for use with workstations that dont have regular connectivity
+with the VBR server. VBR installs an agent on the machine, gives it XML configuration
+that tells it to regularly backup user files to disk D or wherever
+and then it is hands off, do your thing.<br>
+VBR periodically checks if the XML policy deployed is the same as currently set
+during protection group discovery.
+
+This one is bit tricky to monitor well. In history and with powershell there is
+track record of what went on, but the policy update checks are poisoning it
+and there is no easy way to filter those out. Meaning that report of last 
+session could be Successful, but it's the god damned policy update and not 
+actual backup running.
+
+So I guess the solution here is to check actual backups themselves, rather 
+than policy session runs.
+
 
 To gather data with powershell `Get-VBRJob` works, but since v10 of VBR
 the developers dont want people to use it for agent base backups.<br>
 For those the `Get-VBRComputerBackupJob` should be used.
 
-....its unfinished here...
+....its unfinished here...  still issue of how to differentiate between policy
+update and actual backup job
 
 Get-VBRJob
 
@@ -228,7 +250,7 @@ scrape_configs:
   save and test should be green<br>
 * once some values are pushed to prometheus, create a new dashboard...
 
-![prometheus_working_pic_confirmation](https://i.imgur.com/aFKtSTe.png)
+![prometheus_working_pic_confirmation](https://i.imgur.com/hO8eERV.png)
 
 </details>
 
@@ -287,7 +309,7 @@ Invoke-RestMethod `
 
 Heres how the data look in prometheus when executing `storage_diskC_free_space_bytes` query
 
-![first_put](https://i.imgur.com/9G0QcuT.png)
+![first_put](https://i.imgur.com/ZycWmHz.png)
 
 The labels help us target the data in grafana.
 
@@ -306,7 +328,7 @@ The labels help us target the data in grafana.
 
 should look in the end somewhat like this
 
-![first_graph](https://i.imgur.com/DLnCWdB.png)
+![first_graph](https://i.imgur.com/KW3B9dd.png)
 
 *extra info*<br>
 [Examples.](https://prometheus.io/docs/prometheus/latest/querying/examples/)
@@ -368,7 +390,7 @@ What happens under the hood:
 
 # Pushgateway
 
-![pic_pushgateway](https://i.imgur.com/4GZIu8g.png)
+![pic_pushgateway](https://i.imgur.com/64Fqzfd.png)
 
 Ideally one uses a subdomain and https for pushgateway, for that:
 
@@ -422,7 +444,7 @@ enable the timer: `sudo systemctl enable pushgateway_wipe.timer`
 
 # Prometheus
 
-![pic_prometheus](https://i.imgur.com/YzNWZQb.png)
+![pic_prometheus](https://i.imgur.com/7uFdC6J.png)
 
 In the compose file the data retention is set to 45 days.
 
@@ -457,7 +479,7 @@ Theres no white space in the query, so dots are used.
 
 # Grafana dashboard
 
-![panel-status-history](https://i.imgur.com/gO6CW7i.png)
+![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
 
 Might be bit difficult to make the dashboard right away with too little data
 on Prometheus yet. Use small time ranges.
@@ -489,7 +511,7 @@ The first panel is for seeing last X days backup history, at quick glance
 
 ---
 
-![disk-use](https://i.imgur.com/9hNGx9K.png)
+![disk-use](https://i.imgur.com/Ijw2WoM.png)
 
 The second panel is to get info how full repositories are.<br>
 Surprisingly grafana is not as capable as I hoped.
@@ -523,7 +545,7 @@ the idea of fixing this in their discussion on github.
 
 ---  
 
-![panel-table](https://i.imgur.com/rBU2cJq.png)
+![panel-table](https://i.imgur.com/OCbIiBF.png)
 
 The third panel is a table with general jobs info.
 
@@ -588,5 +610,24 @@ The third panel is a table with general jobs info.
 
 # googled out shit
 
+* https://forums.veeam.com/post434804.html
+* http://dewin.me/powershellref/500-veeam-backup-replication/201-understanding-session-and-backup-structure.html#session
+* https://blog.smasterson.com/2017/12/22/veeam-v9-my-veeam-report-9-5-3/
 * [get repository total size and free size](https://forums.veeam.com/powershell-f26/v11-get-vbrbackuprepository-space-properties-t72415.html)
 * https://www.reddit.com/r/Veeam/comments/12a15cu/useful_veeam_toolsscripts/
+* https://gist.github.com/smasterson/9136468
+* https://community.veeam.com/discussion-boards-66/vbr-powershell-command-to-fetch-agent-based-backup-2598
+
+# Failed
+
+Here goes bits of failed attempts of switching to Get-VBRComputerBackupJob and 
+Get-VBRComputerBackupJobSession.
+
+```
+# GET AN ARRAY OF VEAAM JOBS, SORTED BY TYPE and NAME,
+# EXCLUDE AGENT BASED BACKUPS AS IN FUTURE VEEAM VERSIONS Get-VBRJob
+# WILL NOT RETURN THEM
+$VeeamJobs = @(Get-VBRJob | Sort-Object typetostring, name | `
+  ? {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' `
+  -and $_.BackupPlatform.Platform -ne 'EEndPoint'})
+```

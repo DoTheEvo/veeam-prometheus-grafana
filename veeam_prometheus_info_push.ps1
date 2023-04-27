@@ -10,7 +10,8 @@ $base_url = "https://push.example.com"
 
 Function ConvertToUnixTime([AllowNull()][Nullable[DateTime]] $ttt) {
     if (!$ttt) { return 0 }
-    return $ttt | Get-Date -UFormat %s -Millisecond 0
+    $epoch = $ttt | Get-Date -UFormat %s -Millisecond 0
+    return $epoch -as [int]
 }
 
 # WHEN USING HTTPS THIS FORCES TLS 1.2 INSTEAD OF POWERSHELL DEFAULT 1.0
@@ -46,7 +47,7 @@ Invoke-RestMethod `
 }
 
 # ----------------------------------------------------------------------------
-# ----------------------------------------------------------------------------
+# ----------------------  JOBS INFO  -----------------------------------------
 
 # GET AN ARRAY OF VEAAM JOBS
 $VeeamJobs = Get-VBRJob | Sort-Object typetostring, name
