@@ -91,7 +91,7 @@ Get-VBRNASBackup
 is separate universal guide-by-example for monitoring docker containers with
 Prometheus Grafana Loki. Might be useful too.
 
-# Files and directory structure
+## Files and directory structure
 
 ```
 /home/
@@ -115,7 +115,7 @@ Prometheus Grafana Loki. Might be useful too.
 The 3 files must be provided.</br>
 The directories are created by docker compose on the first run.
 
-# docker-compose
+## docker-compose
 
 Three containers to spin up.</br>
 
@@ -152,7 +152,7 @@ services:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:9.4.7
+    image: grafana/grafana:9.5.1
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -196,11 +196,14 @@ GF_USERS_ALLOW_SIGN_UP=false
 #GF_DATE_FORMATS_INTERVAL_DAY = dddd
 ```
 
+In the `.env` above, there are two settings for grafana commented out.
+Uncomment if prefering seeing days of the week on the X axis instead of exact date.
+
 **All containers must be on the same network**.</br>
 Which is named in the `.env` file.</br>
 If one does not exist yet: `docker network create caddy_net`
 
-# Reverse proxy
+## Reverse proxy
 
 Caddy v2 is used, details
 [here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/caddy_v2).</br>
@@ -216,7 +219,7 @@ push.{$MY_DOMAIN} {
 }
 ```
 
-# Prometheus configuration
+## Prometheus configuration
 
 #### prometheus.yml
 
@@ -243,7 +246,11 @@ scrape_configs:
       - targets: ['pushgateway:9091']
 ```
 
-# Grafana configuration
+## Start the containers 
+
+* `docker compose up -d`
+
+## Grafana configuration
 
 * first run login with admin/admin
 * in Preferences > Datasources set `http://prometheus:9090` for url<br>
@@ -372,6 +379,7 @@ What happens under the hood:
 
 * DEPLOY.cmd - checks if its run as administrator, ends if not
 * DEPLOY.cmd - enables powershell scripts execution on that windows PC
+* DEPLOY.cmd - `Unblock-File` to allow run script not created localy
 * DEPLOY.cmd - creates directory C:\Scripts if it does not existing
 * DEPLOY.cmd - checks if the script already exists, if it does
                renames it with random suffix
@@ -381,7 +389,12 @@ What happens under the hood:
 * TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
 
 ### Script Change log
-
+* v0.3 in development
+  * huge rewrite
+  * fixed agent policies 
+  * fixed backupsize info
+  * added data size info
+  * changed when backup is reported as running
 * v0.2
   * added pushing of repository disk usage info
   * changed metrics name to include units
@@ -416,7 +429,7 @@ Without any action the pushed metrics sit on the pushgateway forever.
 But to better visualize the lack of information coming from the machines
 there might be some benefit to daily wiping pushgateway clean.
 
-For this the dockerhost can have a simple systemd service and timer.
+For this the dockerhost can have a simple systemd service and a timer.
 
 `pushgateway_wipe.service`
 ```ini
@@ -489,17 +502,17 @@ The first panel is for seeing last X days backup history, at quick glance
 * Visualization = Status history
 * Data source = Prometheus
 * Query, switch from builder to code
-  `veeam_job_result_info{job="veeam_report"}`
+  `veeam_job_result_info{job="veeam_job_report"}`
 * Query options > Min interval = 1h<br>
-  this value sets the "resolution" of status history panel,
-  but the push by default is happening only every hour.
+  this sets the "resolution" of status history panel,
+  but data update by default only every hour.
 * two ways to have nice labels
   * Query > Options > Legend > switch from `Auto` to `Custom`<br>
     Legend = `{{instance}} | {{group}}`
   * Transform > Rename by regex<br>
     Match = `.+group="([^"]*).+instance="([^"]*).*`<br>
     Replace = `$2 | $1`
-* Panel > title = Veeam History
+* Panel > title = `Veeam History`
 * Status history > Show values = never
 * Legend > Visibility = off
 * Value mapping
@@ -514,11 +527,11 @@ The first panel is for seeing last X days backup history, at quick glance
 ![disk-use](https://i.imgur.com/Ijw2WoM.png)
 
 The second panel is to get info how full repositories are.<br>
-Surprisingly grafana is not as capable as I hoped.
+Unfortunately grafana is not as capable as I hoped.
 While their example
 [shows](https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-gauge/)
 exactly what I wanted, they cheated by picking the same max value for all disks.<br>
-So unfortunately no nice GB and TB info, just percent.<br>
+So no nice GB and TB info, just percent.<br>
 Tried to [float](https://github.com/grafana/grafana/discussions/66159)
 the idea of fixing this in their discussion on github.
 
@@ -526,12 +539,12 @@ the idea of fixing this in their discussion on github.
 * Data source = Prometheus
 * Query, switch from builder to code
   ```
-  (veeam_repo_total_size_bytes{job="veeam_report_repo"}
-  - veeam_repo_free_space_bytes{job="veeam_report_repo"})
-  / ((veeam_repo_total_size_bytes{job="veeam_report_repo"}) /100)
+  (veeam_repo_total_size_bytes{job="veeam_repo_report"}
+  - veeam_repo_free_space_bytes{job="veeam_repo_report"})
+  / ((veeam_repo_total_size_bytes{job="veeam_repo_report"}) /100)
   ```
 * Query > Options > Legend > switch from `Auto` to `Custom`<br>
-  Legend = ` {{group}} - {{instance}} - {{server}}`
+  Legend = `{{group}} - {{instance}} - {{server}}`
 * Panel > title = Repositories Disks Usage
 * Bar gauge > Display mode > Basic
 * Standard options > Unit = Misc > Percent (0-100)
@@ -552,15 +565,15 @@ The third panel is a table with general jobs info.
 * Visualization = Table
 * Data source = Prometheus
 * Query, switch from builder to code
-  `veeam_job_result_info{job="veeam_report"}`
+  `veeam_job_result_info{job="veeam_job_report"}`
   * Query options > Format = Table<br>
   * Query options > Type = Instant (query button press to show change)
 * This results in a table where each job's last result is shown,
   plus labels and their values.<br>
   One could start cleaning it up with a Transform,
   but there are other metrics missing and the time stuff is in absolute values
-  instead of X minutes/hours ago.
-* So before cleaning much more mess will be added.
+  instead of X minutes/hours ago.<br>
+  So before cleaning, more mess will be added.
 * [Rename](https://i.imgur.com/fOGGyW1.gif) the original query
   from `A` to `result`.<br>
   This renaming will be used in all following queries so that the fields
@@ -568,22 +581,25 @@ The third panel is a table with general jobs info.
 * Create following queries, the first line is the new name,
   the second is the query code itself.<br>
   Every query Options are set to **table** and **instant**.
-  * `total_size`<br>
-    `veeam_job_totalsize_bytes{job="veeam_report"}`
+  * `data_size`<br>
+    `veeam_job_data_size_bytes{job="veeam_job_report"}`
+  * `backup_size`<br>
+    `veeam_job_backup_size_bytes{job="veeam_job_report"}`
   * `job_runtime`<br>
-    `veeam_job_duration_seconds{job="veeam_report"}`
+    `veeam_job_end_time_timestamp_seconds{job="veeam_job_report"} 
+     - veeam_job_start_time_timestamp_seconds{job="veeam_job_report"}`
   * `last_job_run`<br>
-    `round(time()-veeam_job_end_time_timestamp_seconds{job="veeam_report"})`
+    `round(time()-veeam_job_end_time_timestamp_seconds{job="veeam_job_report"})`
   * `last_report`<br>
-    `round(time()-push_time_seconds{job="veeam_report"})`
-* Now the result is that there are 5 tables, switchable from a drop down menu,
-  But they need to be combined in to one table.
+    `round(time()-push_time_seconds{job="veeam_job_report"})`
+* Now the results are there in 6 tables, switchable from a drop down menu,
+  but they need to be combined in to one table.
 * Transform > Join by field > Mode = OUTER; Field = instance
 * Now theres one long table with lot of duplication as every query brought 
   labels again. Now to clean it up.
 * Transform > Organize fields
   * Hide unwanted fields, rename headers for fields that are kept
-  * Hiding anything with number 2, 3, 4, 5 in name works to get bulk of it gone
+  * Hiding anything with number 2, 3, 4, 5, 6 in name works to get bulk of it gone
   * Reorder with drag and drop
 * Now to tweak how it all looks and show readable values
 * Panel options > Title = empty
@@ -607,6 +623,10 @@ The third panel is a table with general jobs info.
   * group name; some color with some transparency to not be too loud
 
 ----
+
+To set the dashboard to be shown right away when visiting the domain
+
+* User (right top corner) > Profile > Home Dashboard > Set > Save
 
 # googled out shit
 

@@ -11,7 +11,10 @@ if %errorLevel% == 0 (
 )
 
 echo - powershell ExecutionPolicy changing to RemoteSigned
+echo - and setting Unblock-File for the script path
 powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+powershell.exe Unblock-File -Path "C:\Scripts\veeam_prometheus_info_push.ps1"
+
 
 echo - checking if C:\Scripts folder exists, creating it if not
 

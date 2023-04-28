@@ -13,9 +13,11 @@ $BASE_URL = "https://push.example.com"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # USING EPOCH TIME, SECONDS SINCE 1.1.1970, UTC
-Function ConvertToUnixTime([AllowNull()][Nullable[DateTime]] $ttt) {
+Function GetUnixTimeUTC([AllowNull()][Nullable[DateTime]] $ttt) {
     if (!$ttt) { return 0 }
-    return $ttt | Get-Date -UFormat %s -Millisecond 0
+    [int]$unixtime = (get-date -Date $ttt.ToUniversalTime() -UFormat %s).`
+    Substring(0,10)
+    return $unixtime
 }
 
 # ----------------------------------------------------------------------------
@@ -25,7 +27,7 @@ Function ConvertToUnixTime([AllowNull()][Nullable[DateTime]] $ttt) {
 Function PushDataToPrometheus([Object] $d)
 {
 
-# -----------------  PUSH OF BACKUP JOBS REPORT ------------------------------
+# -----------------  PUSH OF BACKUP JOBS REPORT ---------------------
 
 if ($d.report_type -eq 'veeam_job_report')
 {
@@ -44,14 +46,14 @@ veeam_job_backup_size_bytes $($d.backup_size)
 # SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
 Invoke-RestMethod `
     -Method PUT `
-    -Uri "$($d.url)/metrics/job/$($d.report_type)/instance/$($d.name)/group/`
-          $($d.group)/job_type/$($d.type)" `
+    -Uri "$($d.url)/metrics/job/$($d.report_type)/instance/$($d.id)/group/`
+          $($d.group)/type/$($d.type)/name/$($d.name)/server/$($d.server)" `
     -Body $body
 }
 
-# -----------------  PUSH OF REPO REPORT  ------------------------------------
+# -----------------  PUSH OF REPO REPORT  ---------------------------
 
-if ($d.push_type -eq 'veeam_repo_report')
+if ($d.report_type -eq 'veeam_repo_report')
 {
 
 # PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
@@ -66,8 +68,8 @@ veeam_repo_free_space_bytes $($d.free)
 # SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
 Invoke-RestMethod `
     -Method PUT `
-    -Uri "$($d.url)/metrics/job/$($d.report_type)/instance/$($d.name)/group/`
-          $($d.group)/server/$($d.server)" `
+    -Uri "$($d.url)/metrics/job/$($d.report_type)/instance/$($d.id)/group/`
+          $($d.group)/server/$($d.server)/name/$($d.name)" `
     -Body $body
 }
 
@@ -81,26 +83,22 @@ $Repos = Get-VBRBackupRepository
 foreach ($Repo in $Repos)
 {
 
-$REPO_NAME  = $Repo.Name
-$TOTAL_SIZE = $Repo.GetContainer().CachedTotalSpace.InBytes
-$FREE_SPACE = $Repo.GetContainer().CachedFreeSpace.InBytes
-
-# --------------  SEND REPO DATA TO PUSHGATEWAY  -----------------------------
-
-# CREATE A CUSTOM OBJECT FROM GATHERED DATA
+# CREATE A CUSTOM OBJECT WITH REPO DATA
 $REPO_DATA = [PSCustomObject]@{
-    push_type = 'repo_push'
-    name = $REPO_NAME
-    server = $env:COMPUTERNAME
+    report_type = 'veeam_repo_report'
+    id = $Repo.Id
+    name = $Repo.Name
     group = $GROUP
-    size = $TOTAL_SIZE
-    free = $FREE_SPACE
+    server = $env:COMPUTERNAME
+    size = $Repo.GetContainer().CachedTotalSpace.InBytes
+    free = $Repo.GetContainer().CachedFreeSpace.InBytes
     url = $BASE_URL
 }
 
 $REPO_DATA
-PushDataToPrometheus $REPO_DATA
 "------------------------------"
+
+PushDataToPrometheus $REPO_DATA
 
 }
 
@@ -118,6 +116,10 @@ $VeeamJobs = @(Get-VBRJob | Sort-Object typetostring, name | `
 # FOR EVERY JOB GATHER BASIC INFO
 foreach ($Job in $VeeamJobs)
 {
+
+# --------------  GET JOB ID  -------------------------------------
+
+$JOB_ID = $Job.Id
 
 # --------------  GET JOB NAME  -------------------------------------
 
@@ -143,12 +145,12 @@ if (!$Job.IsScheduleEnabled) { $LAST_SESSION_RESULT_CODE = -2}
 # --------------  GET JOB START AND STOP TIME -----------------------
 
 $LastSession = $Job.FindLastSession()
-$START_TIME_UTC_EPOCH = ConvertToUnixTime($LastSession.progress.StartTimeLocal)
-$STOP_TIME_UTC_EPOC = ConvertToUnixTime($LastSession.progress.StopTimeLocal)
+$START_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.progress.StartTimeLocal)
+$STOP_TIME_UTC_EPOC = GetUnixTimeUTC($LastSession.progress.StopTimeLocal)
 
 # TO VISUALIZE JOB RUN IN GRAPH
 # LAST_SESSION_RESULT_CODE IS CHANGED IF JOB RUN IN LAST HOUR
-$SecondsAgo = (ConvertToUnixTime(Get-Date)) - $STOP_TIME_UTC_EPOC
+$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOC
 if ($SecondsAgo -le 3600) { $LAST_SESSION_RESULT_CODE = -1 }
 
 # --------------  GET JOB DATA AND BACKUP SZE -----------------------
@@ -192,6 +194,10 @@ $AgentJobs = Get-VBRComputerBackupJob
 foreach ($Job in $AgentJobs)
 {
 
+# --------------  GET JOB ID  -------------------------------------
+
+$JOB_ID = $Job.Id
+
 # --------------  GET JOB NAME  -------------------------------------
 
 $JOB_NAME = $Job.Name
@@ -227,12 +233,12 @@ if (-NOT $Job.JobEnabled) { $LAST_SESSION_RESULT_CODE = -2}
 
 # --------------  GET JOB START AND STOP TIME -----------------------
 
-$START_TIME_UTC_EPOCH = ConvertToUnixTime($LastSession.CreationTime)
-$STOP_TIME_UTC_EPOC = ConvertToUnixTime($LastSession.EndTime)
+$START_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.CreationTime)
+$STOP_TIME_UTC_EPOC = GetUnixTimeUTC($LastSession.EndTime)
 
 # TO VISUALIZE JOB RUN IN GRAPH
 # LAST_SESSION_RESULT_CODE IS CHANGED IF JOB RUN IN LAST HOUR
-$SecondsAgo = (ConvertToUnixTime(Get-Date)) - $STOP_TIME_UTC_EPOC
+$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOC
 if ($SecondsAgo -le 3600) { $LAST_SESSION_RESULT_CODE = -1 }
 
 # --------------  GET JOB DATA AND BACKUP SZE -----------------------
@@ -252,10 +258,12 @@ foreach ($r in $RestorePoints) {
 # CREATE A CUSTOM OBJECT FROM GATHERED DATA
 $JOBS_DATA = [PSCustomObject]@{
     report_type = 'veeam_job_report'
+    id = $JOB_ID
     name = $JOB_NAME
     type = $JOB_TYPE
     result = $LAST_SESSION_RESULT_CODE
     group = $GROUP
+    server = $env:COMPUTERNAME
     start_time = $START_TIME_UTC_EPOCH
     end_time = $STOP_TIME_UTC_EPOC
     data_size = $DATA_SIZE
