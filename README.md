@@ -504,11 +504,10 @@ The first panel is for seeing last X days backup history, at quick glance
 * Query, switch from builder to code
   `veeam_job_result_info{job="veeam_job_report"}`
 * Query options > Min interval = 1h<br>
-  this sets the "resolution" of status history panel,
-  but data update by default only every hour.
+  this sets the "resolution" of status history panel
 * two ways to have nice labels
   * Query > Options > Legend > switch from `Auto` to `Custom`<br>
-    Legend = `{{instance}} | {{group}}`
+    Legend = `{{name}} | {{group}}`
   * Transform > Rename by regex<br>
     Match = `.+group="([^"]*).+instance="([^"]*).*`<br>
     Replace = `$2 | $1`
@@ -544,7 +543,7 @@ the idea of fixing this in their discussion on github.
   / ((veeam_repo_total_size_bytes{job="veeam_repo_report"}) /100)
   ```
 * Query > Options > Legend > switch from `Auto` to `Custom`<br>
-  Legend = `{{group}} - {{instance}} - {{server}}`
+  Legend = `{{name}} | {{server}} | {{group}}`
 * Panel > title = Repositories Disks Usage
 * Bar gauge > Display mode > Basic
 * Standard options > Unit = Misc > Percent (0-100)
@@ -586,8 +585,10 @@ The third panel is a table with general jobs info.
   * `backup_size`<br>
     `veeam_job_backup_size_bytes{job="veeam_job_report"}`
   * `job_runtime`<br>
-    `veeam_job_end_time_timestamp_seconds{job="veeam_job_report"} 
-     - veeam_job_start_time_timestamp_seconds{job="veeam_job_report"}`
+     ```
+     veeam_job_end_time_timestamp_seconds{job="veeam_job_report"} 
+     - veeam_job_start_time_timestamp_seconds{job="veeam_job_report"}
+     ```
   * `last_job_run`<br>
     `round(time()-veeam_job_end_time_timestamp_seconds{job="veeam_job_report"})`
   * `last_report`<br>
@@ -608,8 +609,10 @@ The third panel is a table with general jobs info.
   Ignore for now all the colors.
 * Standard options > Unit = `seconds (s)`; Decimals = 0<br>
   This makes the three time columns readable.
-* Thresholds > delete whatever is there; edit Base to be transparent
-* Overrides > Fields with name = Total Size > Add override property >
+* Thresholds > delete whatever is there; set Base to be transparent
+* Overrides > Fields with name = Data Size > Add override property >
+  Standard options > Unit = bytes(SI)
+* Overrides > Fields with name = Backup Size > Add override property >
   Standard options > Unit = bytes(SI)
 * Overrides > Fields with name = Result > Value mappings
   * 0 = Successful; Green
@@ -637,6 +640,7 @@ To set the dashboard to be shown right away when visiting the domain
 * https://www.reddit.com/r/Veeam/comments/12a15cu/useful_veeam_toolsscripts/
 * https://gist.github.com/smasterson/9136468
 * https://community.veeam.com/discussion-boards-66/vbr-powershell-command-to-fetch-agent-based-backup-2598
+* https://www.samuraj-cz.com/clanek/veeam-backup-replication-uvod-terminy-a-principy/
 
 # Failed
 

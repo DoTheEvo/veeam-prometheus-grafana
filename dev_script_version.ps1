@@ -163,6 +163,7 @@ $BACKUP_SIZE = $LastSession.Info.BackupTotalSize
 # CREATE A CUSTOM OBJECT FROM GATHERED DATA
 $JOBS_DATA = [PSCustomObject]@{
     report_type = 'veeam_job_report'
+    id = $JOB_ID
     name = $JOB_NAME
     type = $JOB_TYPE
     result = $LAST_SESSION_RESULT_CODE
