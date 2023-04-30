@@ -20,6 +20,16 @@ Function GetUnixTimeUTC([AllowNull()][Nullable[DateTime]] $ttt) {
     return $unixtime
 }
 
+# JOB DOES NOT HAVE RESTORE POINTS, IT'S CHILREN DO
+# USUALLY THEY ALL HAVE THE SAME NUMBER, BUT THE FUNCTION RETURNS THE LOWEST
+function GetNumberOfRestorePoints($JobObject) {
+  $Backup = Get-VBRBackup | ? {$_.JobId -eq $JobObject.Id}
+  $RestorePoints = Get-VBRRestorePoint -Backup $Backup
+  $Grouped = $RestorePoints | Group-Object -property {$_.Name}
+  $Sorted = $Grouped | Sort-Object -Property Count -Descending
+  return $Sorted[0].Count
+}
+
 # ----------------------------------------------------------------------------
 # ----------------------  REPOSITORY INFO  -----------------------------------
 # ----------------------------------------------------------------------------
@@ -122,6 +132,10 @@ if ($SecondsAgo -le 3600) {
 $DATA_SIZE = $LastSession.BackupStats.DataSize
 $BACKUP_SIZE = $LastSession.Info.BackupTotalSize
 
+# --------------  GET NUMBER OF RESTORE POINTS  ---------------------
+
+$NUMBER_OF_RESTORE_POINTS = GetNumberOfRestorePoints $Job
+
 # --------------  SEND DATA TO PUSHGATEWAY  -------------------------
 
 # PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
@@ -133,6 +147,7 @@ veeam_job_start_time_timestamp_seconds $START_TIME_UTC_EPOCH
 veeam_job_end_time_timestamp_seconds $STOP_TIME_UTC_EPOCH
 veeam_job_data_size_bytes $DATA_SIZE
 veeam_job_backup_size_bytes $BACKUP_SIZE
+veeam_job_restore_points_total $NUMBER_OF_RESTORE_POINTS
 
 "@.Replace("`r`n","`n")
 
@@ -245,6 +260,10 @@ foreach ($r in $RestorePoints) {
     $DATA_SIZE += $Storage.Stats.DataSize
 }
 
+# --------------  GET NUMBER OF RESTORE POINTS  ---------------------
+
+$NUMBER_OF_RESTORE_POINTS = GetNumberOfRestorePoints $Job
+
 # --------------  SEND DATA TO PUSHGATEWAY  -------------------------
 
 # PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
@@ -256,6 +275,7 @@ veeam_job_start_time_timestamp_seconds $START_TIME_UTC_EPOCH
 veeam_job_end_time_timestamp_seconds $STOP_TIME_UTC_EPOCH
 veeam_job_data_size_bytes $DATA_SIZE
 veeam_job_backup_size_bytes $BACKUP_SIZE
+veeam_job_restore_points_total $NUMBER_OF_RESTORE_POINTS
 
 "@.Replace("`r`n","`n")
 
