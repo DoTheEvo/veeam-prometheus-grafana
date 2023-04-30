@@ -1,9 +1,9 @@
 # v0.3  ----------------------------------------------------------------------
 # ----------------------  CUSTOM CONFIG  -------------------------------------
 
-$GROUP = "CocaCola"
-$BASE_URL = "https://push.example.com"
-# $base_url = "http://10.0.19.4:9091"
+$GROUP = 'CocaCola'
+$BASE_URL = 'https://push.example.com'
+$SERVER = $env:COMPUTERNAME # SET CUSTOM NAME IF DESIRED
 
 # ----------------------------------------------------------------------------
 # ----------------------  GENERIC USEFUL STUFF  ------------------------------
@@ -21,61 +21,6 @@ Function GetUnixTimeUTC([AllowNull()][Nullable[DateTime]] $ttt) {
 }
 
 # ----------------------------------------------------------------------------
-# -----------------  PUSH TO PROMETHEUS PUSHGATEWAY  -------------------------
-# ----------------------------------------------------------------------------
-
-Function PushDataToPrometheus([Object] $d)
-{
-
-# -----------------  PUSH OF BACKUP JOBS REPORT ---------------------
-
-if ($d.report_type -eq 'veeam_job_report')
-{
-# PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
-# ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
-# THE EMPTY LINE IS REQUIRED
-$body = @"
-veeam_job_result_info $($d.result)
-veeam_job_start_time_timestamp_seconds $($d.start_time)
-veeam_job_end_time_timestamp_seconds $($d.end_time)
-veeam_job_data_size_bytes $($d.data_size)
-veeam_job_backup_size_bytes $($d.backup_size)
-
-"@.Replace("`r`n","`n")
-
-# SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
-Invoke-RestMethod `
-    -Method PUT `
-    -Uri "$($d.url)/metrics/job/$($d.report_type)/instance/$($d.id)/group/`
-          $($d.group)/type/$($d.type)/name/$($d.name)/server/$($d.server)" `
-    -Body $body
-}
-
-# -----------------  PUSH OF REPO REPORT  ---------------------------
-
-if ($d.report_type -eq 'veeam_repo_report')
-{
-
-# PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
-# ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
-# THE EMPTY LINE IS REQUIRED
-$body = @"
-veeam_repo_total_size_bytes $($d.size)
-veeam_repo_free_space_bytes $($d.free)
-
-"@.Replace("`r`n","`n")
-
-# SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
-Invoke-RestMethod `
-    -Method PUT `
-    -Uri "$($d.url)/metrics/job/$($d.report_type)/instance/$($d.id)/group/`
-          $($d.group)/server/$($d.server)/name/$($d.name)" `
-    -Body $body
-}
-
-}
-
-# ----------------------------------------------------------------------------
 # ----------------------  REPOSITORY INFO  -----------------------------------
 # ----------------------------------------------------------------------------
 
@@ -83,22 +28,25 @@ $Repos = Get-VBRBackupRepository
 foreach ($Repo in $Repos)
 {
 
-# CREATE A CUSTOM OBJECT WITH REPO DATA
-$REPO_DATA = [PSCustomObject]@{
-    report_type = 'veeam_repo_report'
-    id = $Repo.Id
-    name = $Repo.Name
-    group = $GROUP
-    server = $env:COMPUTERNAME
-    size = $Repo.GetContainer().CachedTotalSpace.InBytes
-    free = $Repo.GetContainer().CachedFreeSpace.InBytes
-    url = $BASE_URL
-}
+$TOTALSIZE = $Repo.GetContainer().CachedTotalSpace.InBytes
+$FREESPACE = $Repo.GetContainer().CachedFreeSpace.InBytes
 
-$REPO_DATA
-"------------------------------"
+# PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
+# ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
+# THE EMPTY LINE IS REQUIRED
+$body = @"
+veeam_repo_total_size_bytes $TOTALSIZE
+veeam_repo_free_space_bytes $FREESPACE
 
-PushDataToPrometheus $REPO_DATA
+"@.Replace("`r`n","`n")
+
+# --------------  SEND DATA TO PUSHGATEWAY  -------------------------
+
+Invoke-RestMethod `
+    -Method PUT `
+    -Uri "$BASE_URL/metrics/job/veeam_repo_report/instance/$Repo.Id/group/ `
+          $GROUP/server/$SERVER/name/$Repo.Name" `
+    -Body $body
 
 }
 
@@ -117,67 +65,83 @@ $VeeamJobs = @(Get-VBRJob | Sort-Object typetostring, name | `
 foreach ($Job in $VeeamJobs)
 {
 
-# --------------  GET JOB ID  -------------------------------------
+$LastSession = $Job.FindLastSession()
+#$LastSessionLog = $LastSession.Logger.GetLog().UpdatedRecords.Title
+
+# --------------  GET JOB ID, JOB NAME, JOB TYPE  -------------------
 
 $JOB_ID = $Job.Id
-
-# --------------  GET JOB NAME  -------------------------------------
-
 $JOB_NAME = $Job.Name
-
-# --------------  GET JOB TYPE  -------------------------------------
-
 $JOB_TYPE = $Job.JobType
-
-# --------------  GET JOB LAST SESSION RESULT------------------------
-
-# SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1 | +DISABLED OR NOT SCHEDULED=-2
-$LAST_SESSION_RESULT_CODE = $Job.GetLastResult().value__
-
-# IF THE JOB IS NOT SCHEDULED OR DISABLED, SET LAST_SESSION_RESULT_CODE TO -2
-# JobOptions.RunManually -
-#   TRUE IF THE JOB HAS UNCHECKED CHECKBOX - Run the job automatically
-# IsScheduleEnabled -
-#   FALSE IF THE JOB IS SET TO DISABLED
-if ($Job.Options.JobOptions.RunManually) { $LAST_SESSION_RESULT_CODE = -2}
-if (!$Job.IsScheduleEnabled) { $LAST_SESSION_RESULT_CODE = -2}
 
 # --------------  GET JOB START AND STOP TIME -----------------------
 
-$LastSession = $Job.FindLastSession()
 $START_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.progress.StartTimeLocal)
-$STOP_TIME_UTC_EPOC = GetUnixTimeUTC($LastSession.progress.StopTimeLocal)
+$STOP_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.progress.StopTimeLocal)
 
-# TO VISUALIZE JOB RUN IN GRAPH
-# LAST_SESSION_RESULT_CODE IS CHANGED IF JOB RUN IN LAST HOUR
-$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOC
-if ($SecondsAgo -le 3600) { $LAST_SESSION_RESULT_CODE = -1 }
+# --------------  GET JOB LAST RESULT--------------------------------
 
-# --------------  GET JOB DATA AND BACKUP SZE -----------------------
+# OFFICIAL VBR RESULT CODES: SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1
+# ADDED: DISABLED_OR_NOT_SCHEDULED=99 | RUNNING_FULL_OR_SYNT_FULL_BACKUP=-11
+$LAST_SESSION_RESULT_CODE = $Job.GetLastResult().value__
+
+# Options.JobOptions.RunManually -
+#   TRUE IF THE JOB HAS UNCHECKED CHECKBOX - Run the job automatically
+# IsScheduleEnabled -
+#   FALSE IF THE JOB IS SET TO DISABLED
+if ($Job.Options.JobOptions.RunManually) { $LAST_SESSION_RESULT_CODE = 99}
+if (!$Job.IsScheduleEnabled) { $LAST_SESSION_RESULT_CODE = 99}
+
+# TO VISUALIZE WHEN THE JOB RUN HAPPENED IN GRAPH
+# AND TO DISTINGUISH FULL BACKUP OR A FULL SYNTHETIC BACKUP RUNS
+$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOCH
+if ($SecondsAgo -le 3600) {
+
+    # ------  JOB RUN ENDED WITHIN THE LAST HOUR  ---------
+
+    $LAST_SESSION_RESULT_CODE = -1
+
+    # ------  CHECK IF FULL SYNTHETIC  --------------------
+
+    $LastSessionTasks = Get-VBRTaskSession -Session $LastSession
+    $LastTasksLogs = $LastSessionTasks.Logger.GetLog().UpdatedRecords.Title
+    $SyntText = 'Synthetic full backup created successfully'
+
+    if ($LastTasksLogs -Contains $SyntText) { $LAST_SESSION_RESULT_CODE = -11 }
+
+    # ------  CHECK IF FULL BACKUP  -----------------------
+
+    foreach ($task in $LastSessionTasks) {
+      if ($task.IsFullMode) { $LAST_SESSION_RESULT_CODE = -11 }
+    }
+
+}
+
+# --------------  GET JOB DATA SIZE AND BACKUP SZE ------------------
 
 $DATA_SIZE = $LastSession.BackupStats.DataSize
 $BACKUP_SIZE = $LastSession.Info.BackupTotalSize
 
 # --------------  SEND DATA TO PUSHGATEWAY  -------------------------
 
-# CREATE A CUSTOM OBJECT FROM GATHERED DATA
-$JOBS_DATA = [PSCustomObject]@{
-    report_type = 'veeam_job_report'
-    id = $JOB_ID
-    name = $JOB_NAME
-    type = $JOB_TYPE
-    result = $LAST_SESSION_RESULT_CODE
-    group = $GROUP
-    start_time = $START_TIME_UTC_EPOCH
-    end_time = $STOP_TIME_UTC_EPOC
-    data_size = $DATA_SIZE
-    backup_size = $BACKUP_SIZE
-    url = $BASE_URL
-}
+# PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
+# ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
+# THE EMPTY LINE IS REQUIRED
+$body = @"
+veeam_job_result_info $LAST_SESSION_RESULT_CODE
+veeam_job_start_time_timestamp_seconds $START_TIME_UTC_EPOCH
+veeam_job_end_time_timestamp_seconds $STOP_TIME_UTC_EPOCH
+veeam_job_data_size_bytes $DATA_SIZE
+veeam_job_backup_size_bytes $BACKUP_SIZE
 
-$JOBS_DATA
-PushDataToPrometheus $JOBS_DATA
-"------------------------------"
+"@.Replace("`r`n","`n")
+
+# SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
+Invoke-RestMethod `
+    -Method PUT `
+    -Uri "$BASE_URL/metrics/job/veeam_job_report/instance/$JOB_ID/group/`
+          $GROUP/type/$JOB_TYPE/name/$JOB_NAME/server/$SERVER" `
+    -Body $body
 
 }
 
@@ -185,64 +149,91 @@ PushDataToPrometheus $JOBS_DATA
 # --------------------  AGENT BASED JOBS  ------------------------------------
 # ----------------------------------------------------------------------------
 
-# HASHTABLE THAT EASES TRANSLATION OF RESULTS FROM A WORD TO A NUMBER
-# 'NONE' RESULT APPEARS WHEN THE JOB IS RUNNING
-$ResultsTable = @{"Success"=0;"Warning"=1;"Failed"=2;"None"=-1}
-
 $AgentJobs = Get-VBRComputerBackupJob
 
 # FOR EVERY AGENT JOB GATHER BASIC INFO
 foreach ($Job in $AgentJobs)
 {
 
-# --------------  GET JOB ID  -------------------------------------
-
-$JOB_ID = $Job.Id
-
-# --------------  GET JOB NAME  -------------------------------------
-
-$JOB_NAME = $Job.Name
-
-# --------------  GET JOB TYPE  -------------------------------------
+# --------------  GET AGENT JOB LAST SESSION  ---------------------------
 
 # CREATE A VARIABLE IDENTIFYING IF THE JOB IS A POLICY OR NOT
 $IsPolicy = $False
 if ($Job.Mode -eq 'ManagedByAgent') { $IsPolicy = $True }
 
-if ($IsPolicy -eq $True ) {
+# NOT ALL POLICY SESSIONS ARE BACKUPS, LOT OF CONFIG UPDATES THERE
+# TO FILTER IT TO JUST ACTUAL BACKUPS THE NAME HAS WILDCARDS ADDED
+# https://forums.veeam.com/post434804.html
+$JobNameForQuery = $Job.Name
+if ($IsPolicy) { $JobNameForQuery = '{0}?*' -f $Job.Name }
+$Sessions = Get-VBRComputerBackupJobSession -Name $JobNameForQuery
+$LastSession = $Sessions[0]
+
+# --------------  GET AGENT JOB ID, NAME, TYPE  ---------------------
+
+$JOB_ID = $Job.Id
+$JOB_NAME = $Job.Name
+
+if ($IsPolicy) {
     $JOB_TYPE = 'EpAgentPolicy'
 } else {
     $JOB_TYPE = 'EpAgentBackup'
 }
 
-# --------------  GET JOB LAST SESSION RESULT------------------------
-
-# NOT ALL POLICY SESSIONS ARE BACKUPS, LOT OF CONFIG UPDATES THERE
-# TO FILTER IT TO JUST ACTUAL BACKUPS THE NAME HAS WILDCARD ADDED
-# https://forums.veeam.com/post434804.html
-
-$JobNameForQuery = $Job.Name
-if ($IsPolicy -eq $True ) { $JobNameForQuery = '{0}?*' -f $Job.Name }
-
-$Sessions = Get-VBRComputerBackupJobSession -Name $JobNameForQuery
-$LastSession = $Sessions[0]
-
-$LAST_SESSION_RESULT_CODE = $ResultsTable[$LastSession.Result.ToString()]
-
-if (-NOT $Job.ScheduleEnabled) { $LAST_SESSION_RESULT_CODE = -2}
-if (-NOT $Job.JobEnabled) { $LAST_SESSION_RESULT_CODE = -2}
-
-# --------------  GET JOB START AND STOP TIME -----------------------
+# --------------  GET AGENT JOB START AND STOP TIME -----------------
 
 $START_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.CreationTime)
-$STOP_TIME_UTC_EPOC = GetUnixTimeUTC($LastSession.EndTime)
+$STOP_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.EndTime)
 
-# TO VISUALIZE JOB RUN IN GRAPH
-# LAST_SESSION_RESULT_CODE IS CHANGED IF JOB RUN IN LAST HOUR
-$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOC
-if ($SecondsAgo -le 3600) { $LAST_SESSION_RESULT_CODE = -1 }
+# --------------  GET AGENT JOB LAST SESSION RESULT------------------
 
-# --------------  GET JOB DATA AND BACKUP SZE -----------------------
+# AGENT JOBS HAVE DIFFERENT RESULT CODES THAN REGULAR JOBS
+#     RUNNING=0 | SUCCESS=1 | WARNING=2 | FAILED=3
+# THEREFORE RESULT value__ WILL NOT BE USED, INSTEAD A HASHTABLE TRANSLATION
+
+# HASHTABLE THAT EASES TRANSLATION OF RESULTS FROM A WORD TO A NUMBER
+# 'NONE' RESULT APPEARS WHEN THE JOB IS RUNNING
+$ResultsTable = @{"Success"=0;"Warning"=1;"Failed"=2;"None"=-1}
+
+# OFFICIAL VBR RESULT CODES: SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1
+# ADDED: DISABLED_OR_NOT_SCHEDULED=99 | RUNNING_FULL_OR_SYNT_FULL_BACKUP=-11
+$LAST_SESSION_RESULT_CODE = $ResultsTable[$LastSession.Result.ToString()]
+
+if (!$Job.ScheduleEnabled) { $LAST_SESSION_RESULT_CODE = 99}
+if (!$Job.JobEnabled) { $LAST_SESSION_RESULT_CODE = 99}
+
+# TO VISUALIZE WHEN THE JOB RUN HAPPENED IN GRAPH
+# AND TO DISTINGUISH FULL BACKUP OR A FULL SYNTHETIC BACKUP RUNS
+$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOCH
+if ($SecondsAgo -le 3600) {
+
+    # ------  AGENT JOB RUN ENDED WITHIN THE LAST HOUR  ---
+
+    $LAST_SESSION_RESULT_CODE = -1
+
+    # ------  CHECK IF FULL SYNTHETIC  --------------------
+
+    $LastSessionTasks = Get-VBRTaskSession -Session $LastSession
+    $LastTasksLogs = $LastSessionTasks.Logger.GetLog().UpdatedRecords.Title
+    $SyntText = 'Synthetic full backup created successfully'
+
+    if ($LastTasksLogs -Contains $SyntText) { $LAST_SESSION_RESULT_CODE = -11 }
+
+    # ------  CHECK IF FULL BACKUP  -----------------------
+
+    $ActiveFullText = 'Active Full backup created'
+
+    if ($LastTasksLogs -Contains $ActiveFullText) {
+        $LAST_SESSION_RESULT_CODE = -11
+    }
+
+    # foreach ($task in $LastSessionTasks) {
+    #   if ($task.IsFullMode) { $LAST_SESSION_RESULT_CODE = -11 }
+    # }
+
+}
+
+# --------------  GET AGENT JOB DATA SIZE AND BACKUP SZE -------------
 
 $AgentBackup = Get-VBRBackup -Name $Job.Name
 $RestorePoints = Get-VBRRestorePoint -Backup $AgentBackup
@@ -256,24 +247,23 @@ foreach ($r in $RestorePoints) {
 
 # --------------  SEND DATA TO PUSHGATEWAY  -------------------------
 
-# CREATE A CUSTOM OBJECT FROM GATHERED DATA
-$JOBS_DATA = [PSCustomObject]@{
-    report_type = 'veeam_job_report'
-    id = $JOB_ID
-    name = $JOB_NAME
-    type = $JOB_TYPE
-    result = $LAST_SESSION_RESULT_CODE
-    group = $GROUP
-    server = $env:COMPUTERNAME
-    start_time = $START_TIME_UTC_EPOCH
-    end_time = $STOP_TIME_UTC_EPOC
-    data_size = $DATA_SIZE
-    backup_size = $BACKUP_SIZE
-    url = $BASE_URL
-}
+# PROMETHEUS REQUIRES LINUX LINE ENDINGS, SO \r\n IS REPLACED WITH \n
+# ALSO POWERSHELL FEATURE "Here-Strings" IS USED, @""@ DEFINES BLOCK OF TEXT
+# THE EMPTY LINE IS REQUIRED
+$body = @"
+veeam_job_result_info $LAST_SESSION_RESULT_CODE
+veeam_job_start_time_timestamp_seconds $START_TIME_UTC_EPOCH
+veeam_job_end_time_timestamp_seconds $STOP_TIME_UTC_EPOCH
+veeam_job_data_size_bytes $DATA_SIZE
+veeam_job_backup_size_bytes $BACKUP_SIZE
 
-$JOBS_DATA
-PushDataToPrometheus $JOBS_DATA
-"------------------------------"
+"@.Replace("`r`n","`n")
+
+# SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
+Invoke-RestMethod `
+    -Method PUT `
+    -Uri "$BASE_URL/metrics/job/veeam_job_report/instance/$JOB_ID/group/`
+          $GROUP/type/$JOB_TYPE/name/$JOB_NAME/server/$SERVER" `
+    -Body $body
 
 }
