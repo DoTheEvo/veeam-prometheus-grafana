@@ -488,7 +488,7 @@ To delete all metrics on prometheus
 To delete metrics based off instance or group
 
 * `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={instance=~"^Backup.Copy.Job.*"}'`
-* `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={group=~"cocacola"}'`
+* `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={group=~"CocaCola"}'`
 
 Theres no white space in the query, so dots are used.
 

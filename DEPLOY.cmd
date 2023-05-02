@@ -10,12 +10,6 @@ if %errorLevel% == 0 (
     exit /B
 )
 
-echo - powershell ExecutionPolicy changing to RemoteSigned
-echo - and setting Unblock-File for the script path
-powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
-powershell.exe Unblock-File -Path "C:\Scripts\veeam_prometheus_info_push.ps1"
-
-
 echo - checking if C:\Scripts folder exists, creating it if not
 
 if not exist "C:\Scripts\" (
@@ -40,5 +34,10 @@ if exist C:\Windows\System32\Tasks\veeam_prometheus_info_push (
     echo - importing scheduled task veeam_prometheus_info_push
     schtasks.exe /Create /XML "%~dp0\veeam_prometheus_info_push.xml" /tn "veeam_prometheus_info_push"
 )
+
+echo - powershell ExecutionPolicy changing to RemoteSigned
+echo - and setting Unblock-File for the script path
+powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+powershell.exe Unblock-File -Path "C:\Scripts\veeam_prometheus_info_push.ps1"
 
 pause

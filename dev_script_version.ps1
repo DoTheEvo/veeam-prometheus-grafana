@@ -47,6 +47,8 @@ $Repos = Get-VBRBackupRepository
 foreach ($Repo in $Repos)
 {
 
+$REPO_ID = $Repo.Id
+$REPO_NAME = $Repo.Name
 $TOTALSIZE = $Repo.GetContainer().CachedTotalSpace.InBytes
 $FREESPACE = $Repo.GetContainer().CachedFreeSpace.InBytes
 
@@ -63,10 +65,8 @@ veeam_repo_free_space_bytes $FREESPACE
 
 Invoke-RestMethod `
     -Method PUT `
-    -Uri "$BASE_URL/metrics/job/veeam_repo_report/instance/$Repo.Id/group/ `
-          $GROUP/server/$SERVER/name/$Repo.Name" `
+    -Uri "$BASE_URL/metrics/job/veeam_repo_report/instance/$REPO_ID/group/$GROUP/server/$SERVER/name/$REPO_NAME" `
     -Body $body
-
 }
 
 # ----------------------------------------------------------------------------
@@ -168,10 +168,8 @@ veeam_job_restore_points_total $NUMBER_OF_RESTORE_POINTS
 # SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
 Invoke-RestMethod `
     -Method PUT `
-    -Uri "$BASE_URL/metrics/job/veeam_job_report/instance/$JOB_ID/group/`
-          $GROUP/type/$JOB_TYPE/name/$JOB_NAME/server/$SERVER" `
+    -Uri "$BASE_URL/metrics/job/veeam_job_report/instance/$JOB_ID/group/$GROUP/type/$JOB_TYPE/name/$JOB_NAME/server/$SERVER" `
     -Body $body
-
 }
 
 # ----------------------------------------------------------------------------
@@ -324,8 +322,6 @@ veeam_job_restore_points_total $NUMBER_OF_RESTORE_POINTS
 # SEND GATHERED DATA TO PROMETHEUS PUSHGATEWAY
 Invoke-RestMethod `
     -Method PUT `
-    -Uri "$BASE_URL/metrics/job/veeam_job_report/instance/$JOB_ID/group/`
-          $GROUP/type/$JOB_TYPE/name/$JOB_NAME/server/$SERVER" `
+    -Uri "$BASE_URL/metrics/job/veeam_job_report/instance/$JOB_ID/group/$GROUP/type/$JOB_TYPE/name/$JOB_NAME/server/$SERVER" `
     -Body $body
-
 }
