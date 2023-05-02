@@ -361,8 +361,10 @@ Of note are the results codes for backup jobs
 * 1 = warning
 * 2 = failed
 * -1 =  running
-* -2 = disabled or not scheduled<br>
-  unlike the rest that come from veeam, this one is manually checked and set
+* -11 =  running full backup or full synthetic backup
+* 99 = disabled or not scheduled
+
+The double digit ones are additional ones set by script
 
 #### DEPLOY.cmd file
 
@@ -584,6 +586,8 @@ The third panel is a table with general jobs info.
     `veeam_job_data_size_bytes{job="veeam_job_report"}`
   * `backup_size`<br>
     `veeam_job_backup_size_bytes{job="veeam_job_report"}`
+  * `restore_points`
+    ` veeam_job_restore_points_total{job="veeam_job_report"}`
   * `job_runtime`<br>
      ```
      veeam_job_end_time_timestamp_seconds{job="veeam_job_report"} 
@@ -619,7 +623,8 @@ The third panel is a table with general jobs info.
   * 1 = Warning; Yellow
   * 2 = Failed; Red
   * -1 = Running; Blue
-  * -2 = Disabled | Unscheduled; Grey
+  * -11 = Running full backup; Purple
+  * 99 = Disabled | Unscheduled; Grey
 * Overrides > Fields with name = Group > Value mappings
   * group name; some color with some transparency to not be too loud
   * group name; some color with some transparency to not be too loud

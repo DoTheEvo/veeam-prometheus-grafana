@@ -23,11 +23,20 @@ Function GetUnixTimeUTC([AllowNull()][Nullable[DateTime]] $ttt) {
 # JOB DOES NOT HAVE RESTORE POINTS, IT'S CHILREN DO
 # USUALLY THEY ALL HAVE THE SAME NUMBER, BUT THE FUNCTION RETURNS THE LOWEST
 function GetNumberOfRestorePoints($JobObject) {
-  $Backup = Get-VBRBackup | ? {$_.JobId -eq $JobObject.Id}
-  $RestorePoints = Get-VBRRestorePoint -Backup $Backup
-  $Grouped = $RestorePoints | Group-Object -property {$_.Name}
-  $Sorted = $Grouped | Sort-Object -Property Count -Descending
-  return $Sorted[0].Count
+    $Type = $JobObject.info.JobType
+
+    if ($Type -eq 'NasBackup') {
+        $NasBackup = Get-VBRNASBackup | ? {$_.JobId -eq $JobObject.Id}
+        $RestorePoints = Get-VBRNASBackupRestorePoint -NASBackup $NasBackup
+        $Grouped = $RestorePoints | Group-Object -property {$_.NASServerName}
+    } else {
+        $Backup = Get-VBRBackup | ? {$_.JobId -eq $JobObject.Id}
+        $RestorePoints = Get-VBRRestorePoint -Backup $Backup
+        $Grouped = $RestorePoints | Group-Object -property {$_.Name}
+    }
+
+    $Sorted = $Grouped | Sort-Object -Property Count -Descending
+    return $Sorted[0].Count
 }
 
 # ----------------------------------------------------------------------------
@@ -129,7 +138,12 @@ if ($SecondsAgo -le 3600) {
 
 # --------------  GET JOB DATA SIZE AND BACKUP SZE ------------------
 
-$DATA_SIZE = $LastSession.BackupStats.DataSize
+$LastSessionTasks = Get-VBRTaskSession -Session $LastSession
+$DATA_SIZE = 0
+foreach ($Task in $LastSessionTasks) {
+    $DATA_SIZE += $Task.Progress.TotalUsedSize
+}
+
 $BACKUP_SIZE = $LastSession.Info.BackupTotalSize
 
 # --------------  GET NUMBER OF RESTORE POINTS  ---------------------
@@ -183,6 +197,7 @@ $JobNameForQuery = $Job.Name
 if ($IsPolicy) { $JobNameForQuery = '{0}?*' -f $Job.Name }
 $Sessions = Get-VBRComputerBackupJobSession -Name $JobNameForQuery
 $LastSession = $Sessions[0]
+$LastSessionTasks = Get-VBRTaskSession -Session $LastSession
 
 # --------------  GET AGENT JOB ID, NAME, TYPE  ---------------------
 
@@ -228,7 +243,6 @@ if ($SecondsAgo -le 3600) {
 
     # ------  CHECK IF FULL SYNTHETIC  --------------------
 
-    $LastSessionTasks = Get-VBRTaskSession -Session $LastSession
     $LastTasksLogs = $LastSessionTasks.Logger.GetLog().UpdatedRecords.Title
     $SyntText = 'Synthetic full backup created successfully'
 
@@ -248,16 +262,44 @@ if ($SecondsAgo -le 3600) {
 
 }
 
-# --------------  GET AGENT JOB DATA SIZE AND BACKUP SZE -------------
+# --------------  GET AGENT JOB DATA SIZE  --------------------------
+
+$DATA_SIZE = 0
+
+# THIS WORKS FOR FULL VOLUME BACKUPS AND ENTIRE MACHINE BACKUPS
+foreach ($Task in $LastSessionTasks) {
+    $DATA_SIZE += $Task.Progress.TotalUsedSize
+}
+
+# BACKUP MODE WHERE JUST SELECTED FOLDERS ARE BACKED UP LACK SIZE INFO
+# THIS TRIES TO SOLVE IT BY REPORTING BACK SIZE OF THE LAST FULL BACKUP FILE
+# IT WILL BE JUST APPROXIMATION AS COMPRESSION AND DEDUPLI
+if ($Job.BackupType -eq 'SelectedFiles') {
+    $AgentBackup = Get-VBRBackup -Name $Job.Name
+    $RestorePoints = Get-VBRRestorePoint -Backup $AgentBackup | `
+                     Sort-Object -Property CreationTimeUtc -Descending
+    $RestorePointsOnlyFull = $RestorePoints | ? {$_.IsFull}
+
+    if ($RestorePointsOnlyFull.count -gt 0) {
+        $Storage = $RestorePointsOnlyFull[0].FindStorage()
+        $VbkSize = $Storage.Stats.BackupSize
+        $dedup = ($Storage.Stats.DedupRatio) / 100
+        $compres = ($Storage.Stats.CompressRatio) / 100
+        if ($dedup -eq 0) { $dedup = 1}
+        if ($compres -eq 0) { $compres = 1}
+        $DATA_SIZE = [int64]($VbkSize / $dedup / $compres)
+    }
+
+}
+
+# --------------  GET AGENT JOB BACKUP SZE  -------------------------
 
 $AgentBackup = Get-VBRBackup -Name $Job.Name
 $RestorePoints = Get-VBRRestorePoint -Backup $AgentBackup
 $BACKUP_SIZE = 0
-$DATA_SIZE = 0
 foreach ($r in $RestorePoints) {
     $Storage = $r.FindStorage()
     $BACKUP_SIZE += $Storage.Stats.BackupSize
-    $DATA_SIZE += $Storage.Stats.DataSize
 }
 
 # --------------  GET NUMBER OF RESTORE POINTS  ---------------------
