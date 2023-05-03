@@ -12,7 +12,7 @@ $SERVER = $env:COMPUTERNAME # SET CUSTOM NAME IF DESIRED
 # WHEN USING HTTPS THIS FORCES TLS 1.2 INSTEAD OF POWERSHELL DEFAULT 1.0
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# USING EPOCH TIME, SECONDS SINCE 1.1.1970, UTC
+# RETURNS EPOCH TIME, SECONDS SINCE 1.1.1970, UTC
 Function GetUnixTimeUTC([AllowNull()][Nullable[DateTime]] $ttt) {
     if (!$ttt) { return 0 }
     [int]$unixtime = (get-date -Date $ttt.ToUniversalTime() -UFormat %s).`
@@ -20,8 +20,12 @@ Function GetUnixTimeUTC([AllowNull()][Nullable[DateTime]] $ttt) {
     return $unixtime
 }
 
-# JOB DOES NOT HAVE RESTORE POINTS, IT'S CHILREN DO
-# USUALLY THEY ALL HAVE THE SAME NUMBER, BUT THE FUNCTION RETURNS THE LOWEST
+# ----------------------------------------------------------------------------
+# ----------------------  VBR FUNCTIONS USED LATER  --------------------------
+# ----------------------------------------------------------------------------
+
+# JOB DOES NOT HAVE RESTORE POINTS, IT'S TASKS DO
+# IF ALL GOES WELL THEY HAVE THE SAME NUMBER, BUT THE FUNCTION RETURNS THE LOWEST
 function GetNumberOfRestorePoints($JobObject) {
     $Type = $JobObject.info.JobType
 
@@ -36,7 +40,16 @@ function GetNumberOfRestorePoints($JobObject) {
     }
 
     $Sorted = $Grouped | Sort-Object -Property Count -Descending
-    return $Sorted[0].Count
+    return $Sorted[-1].Count
+}
+
+# CHECKS TASK LOGS IF A FULL BACKUP WAS DONE
+function WasLastRunFullActiveOrFullSynt($SessionTasks) {
+    $LastTasksLogs = $SessionTasks.Logger.GetLog().UpdatedRecords.Title
+    $SyntText = 'Synthetic full backup created successfully'
+    $ActiveFullText = 'Active Full backup created'
+    return (($LastTasksLogs -Contains $SyntText) -or `
+           ($LastTasksLogs -Contains $ActiveFullText))
 }
 
 # ----------------------------------------------------------------------------
@@ -74,8 +87,8 @@ Invoke-RestMethod `
 # ----------------------------------------------------------------------------
 
 # GET AN ARRAY OF VEAAM JOBS, SORTED BY TYPE and NAME,
-# EXCLUDE AGENT BASED BACKUPS AS IN FUTURE VEEAM VERSIONS Get-VBRJob
-# WILL NOT RETURN THEM
+# EXCLUDE AGENT BASED BACKUPS
+# AS IN FUTURE VEEAM VERSIONS Get-VBRJob WILL NOT RETURN THEM
 $VeeamJobs = @(Get-VBRJob | Sort-Object typetostring, name | `
   ? {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' `
   -and $_.BackupPlatform.Platform -ne 'EEndPoint'})
@@ -85,23 +98,24 @@ foreach ($Job in $VeeamJobs)
 {
 
 $LastSession = $Job.FindLastSession()
-#$LastSessionLog = $LastSession.Logger.GetLog().UpdatedRecords.Title
+$LastSessionTasks = Get-VBRTaskSession -Session $LastSession
+# $LastSessionLog = $LastSession.Logger.GetLog().UpdatedRecords.Title
 
-# --------------  GET JOB ID, JOB NAME, JOB TYPE  -------------------
+# --------------  JOB ID, JOB NAME, JOB TYPE  -----------------------
 
 $JOB_ID = $Job.Id
 $JOB_NAME = $Job.Name
 $JOB_TYPE = $Job.JobType
 
-# --------------  GET JOB START AND STOP TIME -----------------------
+# --------------  JOB START AND STOP TIME  --------------------------
 
 $START_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.progress.StartTimeLocal)
 $STOP_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.progress.StopTimeLocal)
 
-# --------------  GET JOB LAST RESULT--------------------------------
+# --------------  JOB LAST RESULT  ----------------------------------
 
 # OFFICIAL VBR RESULT CODES: SUCCESS=0 | WARNING=1 | FAILED=2 | RUNNING=-1
-# ADDED: DISABLED_OR_NOT_SCHEDULED=99 | RUNNING_FULL_OR_SYNT_FULL_BACKUP=-11
+# ADDED: DISABLED_OR_NOT_SCHEDULED=99 | RUNNING FULL OR SYNT_FULL BACKUP=-11
 $LAST_SESSION_RESULT_CODE = $Job.GetLastResult().value__
 
 # Options.JobOptions.RunManually -
@@ -112,7 +126,7 @@ if ($Job.Options.JobOptions.RunManually) { $LAST_SESSION_RESULT_CODE = 99}
 if (!$Job.IsScheduleEnabled) { $LAST_SESSION_RESULT_CODE = 99}
 
 # TO VISUALIZE WHEN THE JOB RUN HAPPENED IN GRAPH
-# AND TO DISTINGUISH FULL BACKUP OR A FULL SYNTHETIC BACKUP RUNS
+# AND TO DISTINGUISH RUN BEING FULL BACKUP OR A FULL SYNTHETIC BACKUP
 $SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOCH
 if ($SecondsAgo -le 3600) {
 
@@ -120,25 +134,15 @@ if ($SecondsAgo -le 3600) {
 
     $LAST_SESSION_RESULT_CODE = -1
 
-    # ------  CHECK IF FULL SYNTHETIC  --------------------
-
-    $LastSessionTasks = Get-VBRTaskSession -Session $LastSession
-    $LastTasksLogs = $LastSessionTasks.Logger.GetLog().UpdatedRecords.Title
-    $SyntText = 'Synthetic full backup created successfully'
-
-    if ($LastTasksLogs -Contains $SyntText) { $LAST_SESSION_RESULT_CODE = -11 }
-
     # ------  CHECK IF FULL BACKUP  -----------------------
 
-    foreach ($task in $LastSessionTasks) {
-      if ($task.IsFullMode) { $LAST_SESSION_RESULT_CODE = -11 }
+    if (WasLastRunFullActiveOrFullSynt $LastSessionTasks) {
+        $LAST_SESSION_RESULT_CODE = -11
     }
-
 }
 
-# --------------  GET JOB DATA SIZE AND BACKUP SZE ------------------
+# --------------  JOB DATA SIZE AND BACKUP SZE  ---------------------
 
-$LastSessionTasks = Get-VBRTaskSession -Session $LastSession
 $DATA_SIZE = 0
 foreach ($Task in $LastSessionTasks) {
     $DATA_SIZE += $Task.Progress.TotalUsedSize
@@ -182,7 +186,7 @@ $AgentJobs = Get-VBRComputerBackupJob
 foreach ($Job in $AgentJobs)
 {
 
-# --------------  GET AGENT JOB LAST SESSION  ---------------------------
+# --------------  AGENT JOB LAST SESSION  ---------------------------
 
 # CREATE A VARIABLE IDENTIFYING IF THE JOB IS A POLICY OR NOT
 $IsPolicy = $False
@@ -197,7 +201,7 @@ $Sessions = Get-VBRComputerBackupJobSession -Name $JobNameForQuery
 $LastSession = $Sessions[0]
 $LastSessionTasks = Get-VBRTaskSession -Session $LastSession
 
-# --------------  GET AGENT JOB ID, NAME, TYPE  ---------------------
+# --------------  AGENT JOB ID, NAME, TYPE  -------------------------
 
 $JOB_ID = $Job.Id
 $JOB_NAME = $Job.Name
@@ -208,12 +212,12 @@ if ($IsPolicy) {
     $JOB_TYPE = 'EpAgentBackup'
 }
 
-# --------------  GET AGENT JOB START AND STOP TIME -----------------
+# --------------  AGENT JOB START AND STOP TIME  --------------------
 
 $START_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.CreationTime)
 $STOP_TIME_UTC_EPOCH = GetUnixTimeUTC($LastSession.EndTime)
 
-# --------------  GET AGENT JOB LAST SESSION RESULT------------------
+# --------------  AGENT JOB LAST SESSION RESULT  --------------------
 
 # AGENT JOBS HAVE DIFFERENT RESULT CODES THAN REGULAR JOBS
 #     RUNNING=0 | SUCCESS=1 | WARNING=2 | FAILED=3
@@ -231,36 +235,22 @@ if (!$Job.ScheduleEnabled) { $LAST_SESSION_RESULT_CODE = 99}
 if (!$Job.JobEnabled) { $LAST_SESSION_RESULT_CODE = 99}
 
 # TO VISUALIZE WHEN THE JOB RUN HAPPENED IN GRAPH
-# AND TO DISTINGUISH FULL BACKUP OR A FULL SYNTHETIC BACKUP RUNS
+# AND TO DISTINGUISH RUN BEING FULL BACKUP OR A FULL SYNTHETIC BACKUP
 $SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOCH
 if ($SecondsAgo -le 3600) {
 
-    # ------  AGENT JOB RUN ENDED WITHIN THE LAST HOUR  ---
+    # ------  JOB RUN ENDED WITHIN THE LAST HOUR  ---------
 
     $LAST_SESSION_RESULT_CODE = -1
 
-    # ------  CHECK IF FULL SYNTHETIC  --------------------
-
-    $LastTasksLogs = $LastSessionTasks.Logger.GetLog().UpdatedRecords.Title
-    $SyntText = 'Synthetic full backup created successfully'
-
-    if ($LastTasksLogs -Contains $SyntText) { $LAST_SESSION_RESULT_CODE = -11 }
-
     # ------  CHECK IF FULL BACKUP  -----------------------
 
-    $ActiveFullText = 'Active Full backup created'
-
-    if ($LastTasksLogs -Contains $ActiveFullText) {
+    if (WasLastRunFullActiveOrFullSynt $LastSessionTasks) {
         $LAST_SESSION_RESULT_CODE = -11
     }
-
-    # foreach ($task in $LastSessionTasks) {
-    #   if ($task.IsFullMode) { $LAST_SESSION_RESULT_CODE = -11 }
-    # }
-
 }
 
-# --------------  GET AGENT JOB DATA SIZE  --------------------------
+# --------------  AGENT JOB DATA SIZE  ------------------------------
 
 $DATA_SIZE = 0
 
@@ -270,10 +260,8 @@ foreach ($Task in $LastSessionTasks) {
 }
 
 # BACKUP MODE WHERE SELECTED FOLDERS ARE BACKED UP LACK CORRECT SIZE INFO
-# THIS TRIES TO SOLVE IT BY REPORTING THE SIZE OF THE LAST FULL BACKUP FILE
+# TO GET AT LEAST ROUGH IDEA IS TO REPORT SIZE OF THE LAST FULL BACKUP - VBK
 # IT WILL BE JUST APPROXIMATION AND IT MIGHT BE OLD INFO
-# TRIED TO ALSO USE COMPRESSION AND DEDUPLICATION TO CALCULATE DATA SIZE
-# BUT THEY WERE SOMETIMES ALSO EQUALY WRONG
 if ($Job.BackupType -eq 'SelectedFiles') {
     $AgentBackup = Get-VBRBackup -Name $Job.Name
     $RestorePoints = Get-VBRRestorePoint -Backup $AgentBackup | `
@@ -283,13 +271,8 @@ if ($Job.BackupType -eq 'SelectedFiles') {
     if ($RestorePointsOnlyFull.count -gt 0) {
         $Storage = $RestorePointsOnlyFull[0].FindStorage()
         $VbkSize = $Storage.Stats.BackupSize
-        # $dedup = ($Storage.Stats.DedupRatio) / 100
-        # $compres = ($Storage.Stats.CompressRatio) / 100
-        # if ($dedup -eq 0) { $dedup = 1}
-        # if ($compres -eq 0) { $compres = 1}
         $DATA_SIZE = [int64]($VbkSize * 1.3)
     }
-
 }
 
 # --------------  GET AGENT JOB BACKUP SZE  -------------------------
