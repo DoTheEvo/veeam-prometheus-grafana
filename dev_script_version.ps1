@@ -269,9 +269,11 @@ foreach ($Task in $LastSessionTasks) {
     $DATA_SIZE += $Task.Progress.TotalUsedSize
 }
 
-# BACKUP MODE WHERE JUST SELECTED FOLDERS ARE BACKED UP LACK SIZE INFO
-# THIS TRIES TO SOLVE IT BY REPORTING BACK SIZE OF THE LAST FULL BACKUP FILE
-# IT WILL BE JUST APPROXIMATION AS COMPRESSION AND DEDUPLI
+# BACKUP MODE WHERE SELECTED FOLDERS ARE BACKED UP LACK CORRECT SIZE INFO
+# THIS TRIES TO SOLVE IT BY REPORTING THE SIZE OF THE LAST FULL BACKUP FILE
+# IT WILL BE JUST APPROXIMATION AND IT MIGHT BE OLD INFO
+# TRIED TO ALSO USE COMPRESSION AND DEDUPLICATION TO CALCULATE DATA SIZE
+# BUT THEY WERE SOMETIMES ALSO EQUALY WRONG
 if ($Job.BackupType -eq 'SelectedFiles') {
     $AgentBackup = Get-VBRBackup -Name $Job.Name
     $RestorePoints = Get-VBRRestorePoint -Backup $AgentBackup | `
@@ -281,11 +283,11 @@ if ($Job.BackupType -eq 'SelectedFiles') {
     if ($RestorePointsOnlyFull.count -gt 0) {
         $Storage = $RestorePointsOnlyFull[0].FindStorage()
         $VbkSize = $Storage.Stats.BackupSize
-        $dedup = ($Storage.Stats.DedupRatio) / 100
-        $compres = ($Storage.Stats.CompressRatio) / 100
-        if ($dedup -eq 0) { $dedup = 1}
-        if ($compres -eq 0) { $compres = 1}
-        $DATA_SIZE = [int64]($VbkSize / $dedup / $compres)
+        # $dedup = ($Storage.Stats.DedupRatio) / 100
+        # $compres = ($Storage.Stats.CompressRatio) / 100
+        # if ($dedup -eq 0) { $dedup = 1}
+        # if ($compres -eq 0) { $compres = 1}
+        $DATA_SIZE = [int64]($VbkSize * 1.3)
     }
 
 }
