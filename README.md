@@ -8,16 +8,7 @@
 
 **WORK IN PROGRESS**<br>
 **WORK IN PROGRESS**<br>
-**WORK IN PROGRESS**
-
-FUck, gonna have to learn more on backup sessions types - 
-`windows agent policy` vs `windows agent backup`
-
-cuz what [can happen](https://i.imgur.com/0aAvHuM.png) is that last session job
-returned info is on that short little policy shit and the actual backup
-can be failing and dashboard would be unaware.<br>
-Still learning that all non-nas and non-vms backups are agent based.
-No matter if server or agent decides, theres still an agent.
+**BUT ALMOST THERE**
 
 ---------------
 
@@ -38,51 +29,67 @@ in to prometheus. Grafana **dashboard** then visualizes the gathered information
 
 ![dashboard_pic](https://i.imgur.com/pRuYTQF.png)
 
-# Basic info on Veeam Backup & Replication
+<details>
+<summary><h1>Basic info on Veeam Backup & Replication</h1></summary>
 
-There are several types of jobs in VBR
+* VBR is installed on a windows machine. Can be physical or virtual.
+* It needs a repository where to store backups.
+  Can be a local drives, network storage, cloud,..
+* Various types of jobs are created that regularly run, creating backups.
 
-* Virtual Machine backup - Hyper-V / VMware
-* File Backup - for network shares
-* Agent Backup - for physical machines 
-  * Managed by a server, agent does the work
-  * Managed by agent, not a backup job but a **backup policy**
+#### Virtual machines backup
 
-### Backup policy
+* [Official documentation](https://helpcenter.veeam.com/docs/backup/vsphere/backup.html)
 
-* [Official documentation](https://helpcenter.veeam.com/docs/backup/agents/agents_policy.html?ver=120)
+For Hyper-V / VMware.<br>
+Veeam has admin credentails for the hypervisor,
+it initiates the backup process at schedule, creates a snapshot of a VM,
+process the VM's data, copies them in to a repository.<br>
+VM's data are stored in a single file, `vkb` for full backup,
+`vib` for incremental backup.<br>
+Veeam by default creates weekly
+[synthetic full backup,](https://helpcenter.veeam.com/docs/backup/vsphere/synthetic_full_hiw.html)
+which combines `vib` files in to a new standalone `vbk`.
+
+#### Fileshare backup
+
+* [Official documentation](https://helpcenter.veeam.com/docs/backup/vsphere/file_share_support.html)
+
+For network shares, called also just `File Backup`.<br>
+Differs from VM backup in a way files are stored, no vbk and vib files,
+but bunch of `vblob` files.<br>
+Also long term retention requires an archive repository,
+not available in free version.
+
+#### Agent backup - Managed by server 
+
+* [Official documentation](https://helpcenter.veeam.com/docs/backup/agents/agents_job.html)
+
+For physical machines, intented for the ones that run 24/7
+and should be always accessible by Veeam.<br>
+Very similar to VMs backup. The VBR server initiates the backup,
+the agent that is installed on the machine creates VSS snapshot,
+and data end up in a repository, either in a `vkb` file or `vib` file.
+
+#### Agent backup - Managed by agent - Backup policy
+
+* [Official documentation](https://helpcenter.veeam.com/docs/backup/agents/agents_policy.html)
 
 Intended for use with workstations that dont have regular connectivity
-with the VBR server. VBR installs an agent on the machine, gives it XML configuration
-that tells it to regularly backup user files to disk D or wherever
-and then it is hands off, do your thing.<br>
-VBR periodically checks if the XML policy deployed is the same as currently set
-during protection group discovery.
+with the VBR server. VBR installs an agent on the machine,
+hands it XML configuration, a **backup policy**, that tells it how and where
+to regularly backup and then its hands off, agent is in charge.<br>
+Veeam periodically tries to sync the current policy settings with the already
+deployed agents during protection group rescans.
 
-This one is bit tricky to monitor well. In history and with powershell there is
-track record of what went on, but the policy update checks are poisoning it
-and there is no easy way to filter those out. Meaning that report of last 
-session could be Successful, but it's the god damned policy update and not 
-actual backup running.
+This one is bit tricky to monitor. In job history there is a track record
+of what went on, but the policy updates are poisoning it.
+Some extra steps are taken in powershell script to get backup runs without
+policy updates. But as of writting this, there is not yet long enough and
+varied enough test cases to have full confidence.<br>
+So better keep a closer eye on endpoint policy backups.
+</details>
 
-So I guess the solution here is to check actual backups themselves, rather 
-than policy session runs.
-
-
-To gather data with powershell `Get-VBRJob` works, but since v10 of VBR
-the developers dont want people to use it for agent base backups.<br>
-For those the `Get-VBRComputerBackupJob` should be used.
-
-....its unfinished here...  still issue of how to differentiate between policy
-update and actual backup job
-
-Get-VBRJob
-
-Get-VBRComputerBackupJob
-
-Get-VBRNASBackup
-
-`$jobs = Get-VBRJob -WarningAction SilentlyContinue | where {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' -and $_.BackupPlatform.Platform -ne 'EEndPoint'}`
 
 <details>
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
@@ -353,9 +360,20 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
-The script should be pretty readable with the comments in it.
+The script itself should be pretty informative with the comments in it.<br>
 
-Of note are the results codes for backup jobs
+#### Get-VBRJob and Get-VBRComputerBackupJob
+
+Seems that in the past just `Get-VBRJob` was used to get job info.<br>
+But veeam is warning with every use of this cmdlet that it will no longer
+be returning agent-based backup jobs.
+So to not be investing time in to old tech, the script uses
+`Get-VBRComputerBackupJob` and `Get-VBRComputerBackupJobSession`
+and got bigger and messier because of it, but it's ready for that future.
+Though the cmdlets will likely be subjected to some changes
+as they feel kinda limited and quirky. 
+
+#### Job result codes
 
 * 0 = success
 * 1 = warning
@@ -364,39 +382,55 @@ Of note are the results codes for backup jobs
 * -11 =  running full backup or full synthetic backup
 * 99 = disabled or not scheduled
 
-The double digit ones are additional ones set by script
+The double digit ones are addition from script. 
+Also for agent based backups there needed to be some adjustment as they used
+different values.
 
-#### DEPLOY.cmd file
+#### Job run visualization
+
+To show backup run in status graph, the reported job result is -1 or -11 if 
+backup ended anywhere within the last hour.
+This means that even 5 minutes long backups are visualized as if they took up 
+an hour.
+
+#### Data size and Backup size
+
+* Data size - The size of the data being backedup up.<br>
+  There is an issue of being unable to get the correct size for agent based
+  backups that target specific files/folders. If the backup target would be 
+  entire machine or a partition the data would be correct.<br>
+  To solve it at get some size approximation the size of the last vbk file
+  multiplied by `1.3` is used. 
+* Backup size - the combined size all backups of the job.
+
+# DEPLOY.cmd file
 
 The file that eases the installation process
 
-* download [this repo](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
-* extract
-* run `DEPLOY.cmd` as administrator
-* go edit `C:\Scripts\veeam_prometheus_info_push.ps1`
-  to change the `group` name and `base_url`
-* done
+* Download [this repo.](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
+* Extract.
+* Run `DEPLOY.cmd` as administrator.
+* Edit `C:\Scripts\veeam_prometheus_info_push.ps1`
+  to change the `group` name and `base_url`.
+* Done.
 
 What happens under the hood:
 
-* DEPLOY.cmd - checks if its run as administrator, ends if not
-* DEPLOY.cmd - enables powershell scripts execution on that windows PC
-* DEPLOY.cmd - `Unblock-File` to allow run script not created localy
+* DEPLOY.cmd - checks if its run as an administrator, ends if not
 * DEPLOY.cmd - creates directory C:\Scripts if it does not existing
 * DEPLOY.cmd - checks if the script already exists, if it does
                renames it with random suffix
 * DEPLOY.cmd - copies veeam_prometheus_info_push.ps1 in to C:\Scripts
 * DEPLOY.cmd - imports taskscheduler xml task named veeam_prometheus_info_push
-* TASKSCHEDULER - the task executes every hour with random delay of 30 seconds
-* TASKSCHEDULER - runs with the highest privileges as user - SYSTEM (S-1-5-18)
+* TASKSCHEDULER - the task executes every 30 minutes, at xx:15 and xx:45,
+                  with random delay of 30 seconds
+* TASKSCHEDULER - that task runs with the highest privileges as user - SYSTEM (S-1-5-18)
+* DEPLOY.cmd - enables powershell scripts execution on that windows PC
+* DEPLOY.cmd - `Unblock-File` to allow run script not created localy
 
 ### Script Change log
 * v0.3 in development
   * huge rewrite
-  * fixed agent policies 
-  * fixed backupsize info
-  * added data size info
-  * changed when backup is reported as running
 * v0.2
   * added pushing of repository disk usage info
   * changed metrics name to include units
@@ -494,10 +528,18 @@ Theres no white space in the query, so dots are used.
 
 # Grafana dashboard
 
+Queries in grafana have a type - Range or Instant.
+Range being the default returns data from period currently set on the dashboard,
+like last 24 hours, or last 14 days.<br>
+There is a danger in this as some failure could stop backup reporting
+and if a check of the dashboard happens two or three weeks later when data
+moved on, there would be no indication that a job even existed.<br>
+Grafana or prometheus alerts could address this,
+or hardcoding the time range of several months in to queries.
+
 ![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
 
-Might be bit difficult to make the dashboard right away with too little data
-on Prometheus yet. Use small time ranges.
+### Veeam Status History
 
 The first panel is for seeing last X days backup history, at quick glance
 
@@ -506,14 +548,16 @@ The first panel is for seeing last X days backup history, at quick glance
 * Query, switch from builder to code
   `veeam_job_result_info{job="veeam_job_report"}`
 * Query options > Min interval = 1h<br>
-  this sets the "resolution" of status history panel
+  This sets the "resolution" of status history panel,<br>
+  but data are renewed only every 30min unless scheduled task changed.<br>
+  During the first setup something smaller like 10min works well.
 * two ways to have nice labels
   * Query > Options > Legend > switch from `Auto` to `Custom`<br>
     Legend = `{{name}} | {{group}}`
   * Transform > Rename by regex<br>
     Match = `.+group="([^"]*).+instance="([^"]*).*`<br>
     Replace = `$2 | $1`
-* Panel > title = `Veeam History`
+* Panel > title = `Veeam Status History`
 * Status history > Show values = never
 * Legend > Visibility = off
 * Value mapping
@@ -521,20 +565,22 @@ The first panel is for seeing last X days backup history, at quick glance
   * 1 = Warning; Yellow
   * 2 = Failed; Red
   * -1 = Running; Blue
-  * -2 = Disabled | Unscheduled; Grey
+  * -11 = Full Backup; Purple
+  * 99 = Disabled | Unscheduled; Grey
 
 ---
 
 ![disk-use](https://i.imgur.com/Ijw2WoM.png)
 
-The second panel is to get info how full repositories are.<br>
-Unfortunately grafana is not as capable as I hoped.
-While their example
+### Repositories Disk Use
+
+This panel shows how full repositories are.<br>
+Unfortunately grafana is not as capable as I hoped. While their example
 [shows](https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-gauge/)
-exactly what I wanted, they cheated by picking the same max value for all disks.<br>
+exactly what I wanted, they cheated by picking the same max value for all disks.
 So no nice GB and TB info, just percent.<br>
 Tried to [float](https://github.com/grafana/grafana/discussions/66159)
-the idea of fixing this in their discussion on github.
+the idea of maybe addressing this in their discussion on github.
 
 * Visualization = Bar gauge
 * Data source = Prometheus
@@ -546,7 +592,7 @@ the idea of fixing this in their discussion on github.
   ```
 * Query > Options > Legend > switch from `Auto` to `Custom`<br>
   Legend = `{{name}} | {{server}} | {{group}}`
-* Panel > title = Repositories Disks Usage
+* Panel > title = `Repositories Disk Use`
 * Bar gauge > Display mode > Basic
 * Standard options > Unit = Misc > Percent (0-100)
 * Standard options > Min = 0
@@ -561,27 +607,28 @@ the idea of fixing this in their discussion on github.
 
 ![panel-table](https://i.imgur.com/OCbIiBF.png)
 
-The third panel is a table with general jobs info.
+### Job's Details
+
+This panel is a table with more details about jobs.
 
 * Visualization = Table
 * Data source = Prometheus
 * Query, switch from builder to code
   `veeam_job_result_info{job="veeam_job_report"}`
   * Query options > Format = Table<br>
-  * Query options > Type = Instant (query button press to show change)
 * This results in a table where each job's last result is shown,
   plus labels and their values.<br>
   One could start cleaning it up with a Transform,
   but there are other metrics missing and the time stuff is in absolute values
-  instead of X minutes/hours ago.<br>
+  instead of x minutes/hours ago.<br>
   So before cleaning, more mess will be added.
-* [Rename](https://i.imgur.com/fOGGyW1.gif) the original query
+* [Rename](https://i.imgur.com/2CVyvWQ.gif) the original query
   from `A` to `result`.<br>
   This renaming will be used in all following queries so that the fields
   are distinguishable in transformation later.
 * Create following queries, the first line is the new name,
   the second is the query code itself.<br>
-  Every query Options are set to **table** and **instant**.
+  Every query has in Options > Type set to **table**.
   * `data_size`<br>
     `veeam_job_data_size_bytes{job="veeam_job_report"}`
   * `backup_size`<br>
@@ -597,17 +644,18 @@ The third panel is a table with general jobs info.
     `round(time()-veeam_job_end_time_timestamp_seconds{job="veeam_job_report"})`
   * `last_report`<br>
     `round(time()-push_time_seconds{job="veeam_job_report"})`
-* Now the results are there in 6 tables, switchable from a drop down menu,
+* Now the results are there in many tables, switchable from a drop down menu,
   but they need to be combined in to one table.
 * Transform > Join by field > Mode = OUTER; Field = instance
 * Now theres one long table with lot of duplication as every query brought 
   labels again. Now to clean it up.
 * Transform > Organize fields
-  * Hide unwanted fields, rename headers for fields that are kept
-  * Hiding anything with number 2, 3, 4, 5, 6 in name works to get bulk of it gone
-  * Reorder with drag and drop
+  * Hide unwanted fields<br> 
+    Hiding anything with number 2, 3, 4, 5, 6, 7 in name works to get bulk of it gone
+  * Rename headers for fields that are kept.
+  * Reorder with drag and drop.
 * Now to tweak how it all looks and show readable values
-* Panel options > Title = empty
+* Panel options > Title = 'Job's Details'
 * Table > Cell Options > Colored background
 * Table > Cell Options > Background display mode = Gradient<br>
   Ignore for now all the colors.
@@ -635,28 +683,3 @@ The third panel is a table with general jobs info.
 To set the dashboard to be shown right away when visiting the domain
 
 * User (right top corner) > Profile > Home Dashboard > Set > Save
-
-# googled out shit
-
-* https://forums.veeam.com/post434804.html
-* http://dewin.me/powershellref/500-veeam-backup-replication/201-understanding-session-and-backup-structure.html#session
-* https://blog.smasterson.com/2017/12/22/veeam-v9-my-veeam-report-9-5-3/
-* [get repository total size and free size](https://forums.veeam.com/powershell-f26/v11-get-vbrbackuprepository-space-properties-t72415.html)
-* https://www.reddit.com/r/Veeam/comments/12a15cu/useful_veeam_toolsscripts/
-* https://gist.github.com/smasterson/9136468
-* https://community.veeam.com/discussion-boards-66/vbr-powershell-command-to-fetch-agent-based-backup-2598
-* https://www.samuraj-cz.com/clanek/veeam-backup-replication-uvod-terminy-a-principy/
-
-# Failed
-
-Here goes bits of failed attempts of switching to Get-VBRComputerBackupJob and 
-Get-VBRComputerBackupJobSession.
-
-```
-# GET AN ARRAY OF VEAAM JOBS, SORTED BY TYPE and NAME,
-# EXCLUDE AGENT BASED BACKUPS AS IN FUTURE VEEAM VERSIONS Get-VBRJob
-# WILL NOT RETURN THEM
-$VeeamJobs = @(Get-VBRJob | Sort-Object typetostring, name | `
-  ? {$_.BackupPlatform.Platform -ne 'ELinuxPhysical' `
-  -and $_.BackupPlatform.Platform -ne 'EEndPoint'})
-```
