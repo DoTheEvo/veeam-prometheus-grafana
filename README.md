@@ -90,6 +90,8 @@ varied enough test cases to have full confidence.<br>
 So better keep a closer eye on endpoint policy backups.
 </details>
 
+---
+---
 
 <details>
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
@@ -371,7 +373,7 @@ So to not be investing time in to old tech, the script uses
 `Get-VBRComputerBackupJob` and `Get-VBRComputerBackupJobSession`
 and got bigger and messier because of it, but it's ready for that future.
 Though the cmdlets will likely be subjected to some changes
-as they feel kinda limited and quirky. 
+as they feel poorer than the existing ones. 
 
 #### Job result codes
 
@@ -382,9 +384,9 @@ as they feel kinda limited and quirky.
 * -11 =  running full backup or full synthetic backup
 * 99 = disabled or not scheduled
 
-The double digit ones are addition from script. 
-Also for agent based backups there needed to be some adjustment as they used
-different values.
+The double digit ones are addition by the script. 
+Also for agent based backups there needed to be rewrite of their values,
+as they used different ones.
 
 #### Job run visualization
 
@@ -397,10 +399,10 @@ an hour.
 
 * Data size - The size of the data being backedup up.<br>
   There is an issue of being unable to get the correct size for agent based
-  backups that target specific files/folders. If the backup target would be 
+  backups that target specific folders. If the backup target would be 
   entire machine or a partition the data would be correct.<br>
-  To solve it at get some size approximation the size of the last vbk file
-  multiplied by `1.3` is used. 
+  To get at least some size approximation the size of the last vbk file
+  multiplied by `1.3` is used in the report. 
 * Backup size - the combined size all backups of the job.
 
 # DEPLOY.cmd file
@@ -462,8 +464,8 @@ To delete all data from pushgateway
 
 Without any action the pushed metrics sit on the pushgateway forever.
 [This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
-But to better visualize the lack of information coming from the machines
-there might be some benefit to daily wiping pushgateway clean.
+To better visualize possible lack of new reports coming from the machines,
+it be wise to wipe the pushgateway clean daily.
 
 For this the dockerhost can have a simple systemd service and a timer.
 
@@ -507,9 +509,8 @@ Same process as with pushgateway or any other webserver accessible through caddy
 [Official documentation on queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 
 To query something just write plain metrics name, like `veeam_job_result_info`.
-But in the table tab it shows you by default only the result from a recent
-time window. You can switch to what date you want query too apply,
-or switch to graph view and set range to few weeks.
+In the table tab it shows result from a recent time window. Switching to graph
+tab allows larger time range.
 
 More targeted query, with the use of regex, signified by `=~`
 
@@ -529,12 +530,12 @@ Theres no white space in the query, so dots are used.
 # Grafana dashboard
 
 Queries in grafana have a type - Range or Instant.
-Range being the default returns data from period currently set on the dashboard,
+Range being the default, returns data from period currently set on the dashboard,
 like last 24 hours, or last 14 days.<br>
-There is a danger in this as some failure could stop backup reporting
+There is a danger in this, as some failure could stop backup reporting
 and if a check of the dashboard happens two or three weeks later when data
 moved on, there would be no indication that a job even existed.<br>
-Grafana or prometheus alerts could address this,
+Grafana alerts or prometheus alerts can address this,
 or hardcoding the time range of several months in to queries.
 
 ![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
