@@ -1,0 +1,663 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.5.1"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "status-history",
+      "name": "Status history",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 70,
+            "lineWidth": 1
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Successful"
+                },
+                "1": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "Warning"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "Failed"
+                },
+                "99": {
+                  "color": "#505050",
+                  "index": 5,
+                  "text": "Disabled | Unscheduled"
+                },
+                "-1": {
+                  "color": "blue",
+                  "index": 3,
+                  "text": "Running"
+                },
+                "-11": {
+                  "color": "purple",
+                  "index": 4,
+                  "text": "Full Backup"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "interval": "10m",
+      "options": {
+        "colWidth": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "veeam_job_result_info{job=\"veeam_job_report\"}",
+          "legendFormat": "{{name}} | {{group}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Veeam Status History",
+      "type": "status-history"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "displayName": "${__field.displayName}",
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 2,
+      "options": {
+        "displayMode": "basic",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "9.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "(veeam_repo_total_size_bytes{job=\"veeam_repo_report\"}\n- veeam_repo_free_space_bytes{job=\"veeam_repo_report\"})\n/ ((veeam_repo_total_size_bytes{job=\"veeam_repo_report\"}) /100)",
+          "hide": false,
+          "legendFormat": "{{name}} | {{server}} | {{group}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Repositories Disk Use",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/Last Run|Runtime|Last Report/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/Data Size|Backup Size/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last Result"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "#73bf6966",
+                        "index": 0,
+                        "text": "Successful"
+                      },
+                      "1": {
+                        "color": "#fade2a66",
+                        "index": 1,
+                        "text": "Warning"
+                      },
+                      "2": {
+                        "color": "#f2495c66",
+                        "index": 2,
+                        "text": "Failed"
+                      },
+                      "99": {
+                        "color": "#80808066",
+                        "index": 5,
+                        "text": "Disabled | Unscheduled"
+                      },
+                      "-1": {
+                        "color": "#5795f266",
+                        "index": 3,
+                        "text": "Running"
+                      },
+                      "-11": {
+                        "color": "#b877d966",
+                        "index": 4,
+                        "text": " Full Backup"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Group"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "CocaCola": {
+                        "color": "#ff98304d",
+                        "index": 1
+                      },
+                      "pivo": {
+                        "color": "#b877d94d",
+                        "index": 0
+                      },
+                      "water": {
+                        "color": "#73bf694d",
+                        "index": 2
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 6,
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.5.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "veeam_job_result_info{job=\"veeam_job_report\"}",
+          "format": "table",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "result"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": " veeam_job_data_size_bytes{job=\"veeam_job_report\"}",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "data_size"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": " veeam_job_backup_size_bytes{job=\"veeam_job_report\"}",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "backup_size"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": " veeam_job_restore_points_total{job=\"veeam_job_report\"}",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "restore_points"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "veeam_job_end_time_timestamp_seconds{job=\"veeam_job_report\"} \n- veeam_job_start_time_timestamp_seconds{job=\"veeam_job_report\"}",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "job_runtime"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": " round(time()-veeam_job_end_time_timestamp_seconds{job=\"veeam_job_report\"})",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "last_job_run"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": " round(time()-push_time_seconds{job=\"veeam_job_report\"})",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "last_report"
+        }
+      ],
+      "title": "Job's Details",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "instance",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Time 7": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "__name__ 3": true,
+              "__name__ 4": true,
+              "group 2": true,
+              "group 3": true,
+              "group 4": true,
+              "group 5": true,
+              "group 6": true,
+              "group 7": true,
+              "instance": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "job 5": true,
+              "job 6": true,
+              "job 7": true,
+              "name 2": true,
+              "name 3": true,
+              "name 4": true,
+              "name 5": true,
+              "name 6": true,
+              "name 7": true,
+              "server 1": true,
+              "server 2": true,
+              "server 3": true,
+              "server 4": true,
+              "server 5": true,
+              "server 6": true,
+              "server 7": true,
+              "type 2": true,
+              "type 3": true,
+              "type 4": true,
+              "type 5": true,
+              "type 6": true,
+              "type 7": true
+            },
+            "indexByName": {
+              "Time 1": 11,
+              "Time 2": 15,
+              "Time 3": 22,
+              "Time 4": 29,
+              "Time 5": 36,
+              "Time 6": 42,
+              "Time 7": 48,
+              "Value #backup_size": 8,
+              "Value #data_size": 6,
+              "Value #job_runtime": 5,
+              "Value #last_job_run": 4,
+              "Value #last_report": 9,
+              "Value #restore_points": 7,
+              "Value #result": 2,
+              "__name__ 1": 14,
+              "__name__ 2": 16,
+              "__name__ 3": 23,
+              "__name__ 4": 30,
+              "group 1": 0,
+              "group 2": 17,
+              "group 3": 24,
+              "group 4": 31,
+              "group 5": 37,
+              "group 6": 43,
+              "group 7": 49,
+              "instance": 10,
+              "job 1": 12,
+              "job 2": 18,
+              "job 3": 25,
+              "job 4": 32,
+              "job 5": 38,
+              "job 6": 44,
+              "job 7": 50,
+              "name 1": 1,
+              "name 2": 19,
+              "name 3": 26,
+              "name 4": 33,
+              "name 5": 39,
+              "name 6": 45,
+              "name 7": 51,
+              "server 1": 13,
+              "server 2": 20,
+              "server 3": 27,
+              "server 4": 34,
+              "server 5": 40,
+              "server 6": 46,
+              "server 7": 52,
+              "type 1": 3,
+              "type 2": 21,
+              "type 3": 28,
+              "type 4": 35,
+              "type 5": 41,
+              "type 6": 47,
+              "type 7": 53
+            },
+            "renameByName": {
+              "Value #backup_size": "Backup Size",
+              "Value #data_size": "Data Size",
+              "Value #job_runtime": "Runtime",
+              "Value #last_job_run": "Last Run",
+              "Value #last_report": "Last Report",
+              "Value #restore_points": "Restore Points",
+              "Value #result": "Last Result",
+              "group 1": "Group",
+              "name 1": "Job Name",
+              "type 1": "Type"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Veeam Backup & Replication v12",
+  "uid": "b3e00dde-d978-49c0-a564-70de2cc974a2",
+  "version": 7,
+  "weekStart": ""
+}

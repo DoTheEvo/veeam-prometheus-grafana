@@ -368,8 +368,11 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
-Tested on VeeamBackup&Replication **v12**<br>
 The script itself should be pretty informative with the comments in it.<br>
+
+Tested with VBR **v12**<br>
+Might work with v11, except for agent-based backups as there are bugs
+in the new cmdlets in that version.
 
 <details>
 <summary>Changelog</summary>
@@ -530,12 +533,12 @@ Theres no white space in the query, so dots are used.
 
 # Grafana dashboard
 
-Grafana usually shows graphs in a time range, like last 24 hours, or last 14 days.
-This can be set in the top right corner of the dashboard.
-There is a danger that a failure could stop reporting status, and if a check
-of the dashboard would happen two weeks later, and grafana is showing last 7 days
-there be no indication that a job even existed.<br>
-Grafana alerts or prometheus alerts can address this.
+The json file in this repo can be imported in to grafana.
+
+* [VBR_dashboard.json](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/VBR_dashboard.json)
+* Dashboards > New > Import > paste json
+
+There are also steps to recreate it from scratch.
 
 ![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
 
@@ -658,29 +661,41 @@ This panel is a table with more details about jobs.
     Hiding anything with number 2, 3, 4, 5, 6, 7 in name works to get bulk of it gone
   * Rename headers for fields that are kept.
   * Reorder with drag and drop.
-* Now to tweak how it all looks and show readable values
-* Panel options > Title = 'Job's Details'
-* Table > Cell Options > Colored background
-* Table > Cell Options > Background display mode = Gradient<br>
-  Ignore for now all the colors.
-* Standard options > Unit = `seconds (s)`; Decimals = 0<br>
-  This makes the three time columns readable.
+* Panel options > Title = `Job's Details`
 * Thresholds > delete whatever is there; set Base to be transparent
-* Overrides > Fields with name = Data Size > Add override property >
-  Standard options > Unit = bytes(SI)
-* Overrides > Fields with name = Backup Size > Add override property >
-  Standard options > Unit = bytes(SI)
-* Overrides > Fields with name = Result > Value mappings
-  * 0 = Successful; Green
-  * 1 = Warning; Yellow
-  * 2 = Failed; Red
-  * -1 = Running; Blue
-  * -11 = Running full backup; Purple
-  * 99 = Disabled | Unscheduled; Grey
-* Overrides > Fields with name = Group > Value mappings
-  * group name; some color with some transparency to not be too loud
-  * group name; some color with some transparency to not be too loud
-  * group name; some color with some transparency to not be too loud
+* Now the table will be modified using overrides<br>
+  So that columns can be targeted separatly.
+* **Overrides**
+* Fields with name matching regex = `/Last Run|Runtime|Last Report/`<br>
+  Standard options > Unit = `seconds (s)`<br>
+  Standard options > Decimals = `0`
+* Fields with name matching regex = `/Data Size|Backup Size/`<br>
+  Standard options > Unit = `bytes(SI)`<br>
+* Fields with name = `Result` > Value mappings<br>
+  * Value Mapping:
+    * 0 = Successful; Green
+    * 1 = Warning; Yellow
+    * 2 = Failed; Red
+    * -1 = Running; Blue
+    * -11 = Full Backup; Purple
+    * 99 = Disabled | Unscheduled; Grey
+    * the colors should be muted by transparency ~0.4
+  * Cell options > Cell type
+    * `Colored background`
+    * `Gradient`
+* Fields with name = `Group` > Value mappings<br>
+  * Value Mapping:
+    * 0 = water; Green
+    * 1 = CocaCola; Yellow
+    * 2 = beer; Red
+    * the colors should be muted by transparency ~0.3
+  * Cell options > Cell type
+    * `Colored background`
+    * `Gradient`
+* Save and look.
+* Adjusting column width will be creating overrides for that column.<br>
+  Just to be aware, as it might be weird seeing like 12 owerrides afterwards.
+
 
 ----
 
@@ -691,4 +706,10 @@ To set the dashboard to be shown right away when visiting the domain
 
 # Grafana alerts
 
-some day
+Grafana alerts help with the reliability and danger of failure going unnoticed. 
+
+Grafana usually shows graphs in a time range, like last 24 hours,
+or last 14 days. There is a danger that a failure could occur, and if a check
+of the dashboard would happen two weeks later, and grafana is showing last 7 days
+there be no indication that a job even existed.<br>
+
