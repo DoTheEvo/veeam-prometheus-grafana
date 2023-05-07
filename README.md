@@ -372,7 +372,7 @@ Tested on VeeamBackup&Replication **v12**<br>
 The script itself should be pretty informative with the comments in it.<br>
 
 <details>
-<summary>**Changelog**</summary>
+<summary>Changelog</summary>
 
 * v0.3 in development
   * huge rewrite
@@ -574,7 +574,8 @@ The first panel is for seeing last X days backup history, at quick glance
 
 ### Repositories Disk Use
 
-This panel shows how full repositories are.<br>
+This panel shows how full repositories are.
+
 Unfortunately grafana is not as capable as I hoped. While their example
 [shows](https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-gauge/)
 exactly what I wanted, they cheated by picking the same max value for all disks.
@@ -598,6 +599,9 @@ the idea of maybe addressing this in their discussion on github.
 * Standard options > Min = 0
 * Standard options > Max = 100
 * Standard options > Decimals = 0
+* Standard options > Display Name = `${__field.displayName}`<br>
+  Needed [if only one repository](https://github.com/grafana/grafana/issues/48983),
+  to show the name under the bar.
 * Thresholds
   * 90 = red
   * 75 = Yellow
@@ -633,8 +637,8 @@ This panel is a table with more details about jobs.
     `veeam_job_data_size_bytes{job="veeam_job_report"}`
   * `backup_size`<br>
     `veeam_job_backup_size_bytes{job="veeam_job_report"}`
-  * `restore_points`
-    ` veeam_job_restore_points_total{job="veeam_job_report"}`
+  * `restore_points`<br>
+    `veeam_job_restore_points_total{job="veeam_job_report"}`
   * `job_runtime`<br>
      ```
      veeam_job_end_time_timestamp_seconds{job="veeam_job_report"} 
