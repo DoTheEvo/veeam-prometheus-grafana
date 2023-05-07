@@ -97,7 +97,7 @@ So better keep a closer eye on endpoint policy backups.
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
 
 [Here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/prometheus_grafana_loki)
-is separate universal guide-by-example for monitoring docker containers with
+is a separate guide-by-example for monitoring docker containers with
 Prometheus Grafana Loki. Might be useful too.
 
 ## Files and directory structure
@@ -211,6 +211,30 @@ Uncomment if prefering seeing days of the week on the X axis instead of exact da
 Which is named in the `.env` file.</br>
 If one does not exist yet: `docker network create caddy_net`
 
+### prometheus.yml
+
+[Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
+
+A config file for prometheus, bind mounted in to the prometheus container.<br>
+Of note is **honor_labels** set to true,
+which sets that **conflicting labels** like `job`, set during push
+are kept over labels set in `prometheus.yml` for the scrape job.
+[Docs](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config).
+
+`prometheus.yml`
+```yml
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'pushgateway-scrape'
+    scrape_interval: 60s
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+```
+
 ## Reverse proxy
 
 Caddy v2 is used, details
@@ -229,32 +253,6 @@ push.{$MY_DOMAIN} {
 # prom.{$MY_DOMAIN} {
 #     reverse_proxy prometheus:9090
 # }
-```
-
-## Prometheus configuration
-
-#### prometheus.yml
-
-[Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
-
-A config file for prometheus, bind mounted in to prometheus container.<br>
-Of note is **honor_labels** set to true,
-which sets that **conflicting labels** like `job`, set during push
-are kept over labels set in `prometheus.yml` for the scrape job.
-[Docs](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config).
-
-`prometheus.yml`
-```yml
-global:
-  scrape_interval:     15s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'pushgateway-scrape'
-    scrape_interval: 60s
-    honor_labels: true
-    static_configs:
-      - targets: ['pushgateway:9091']
 ```
 
 ## Start the containers 
@@ -370,6 +368,7 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
+Tested on VeeamBackup&Replication **v12**<br>
 The script itself should be pretty informative with the comments in it.<br>
 
 <details>
