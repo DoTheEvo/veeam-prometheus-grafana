@@ -114,7 +114,6 @@ Prometheus Grafana Loki. Might be useful too.
             └── 🗋 prometheus.yml
 ```
 
-* `grafana/` - a directory containing grafanas configs and dashboards
 * `grafana_data/` - a directory where grafana stores its data
 * `prometheus_data/` - a directory where prometheus stores its database and data
 * `.env` - a file containing environment variables for docker compose
@@ -128,20 +127,20 @@ The directories are created by docker compose on the first run.
 
 Three containers to spin up.</br>
 
-* **Prometheus** - prometheus server, pulling, storing, evaluating metrics
-* **Pushgateway** - web server ready to receive pushed information on an open port
-* **Grafana** - web GUI visualization of the collected metrics in nice dashboards
+* **Prometheus** - prometheus server, pulling, storing, evaluating metrics.
+* **Pushgateway** - web server ready to receive pushed information on an open port.
+* **Grafana** - web GUI visualization of the collected metrics in nice dashboards.
 
-Ports are actually mapped to the docker host, to be able to easily access
-these by docker-host-ip and port. But if reverse proxy like caddy is used and 
-subdomains setup, then `ports` section can be removed or replaced by `expose`.
+Of note for prometheus container is **data retention** set to 45 days,
+and **admin api** being enabled.<br>
+Pushgateway has **admin api** enabled too, to be able to execute wipes.
 
 `docker-compose.yml`
 ```yml
 services:
 
   prometheus:
-    image: prom/prometheus:v2.43.0
+    image: prom/prometheus:v2.43.1
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -218,7 +217,7 @@ Caddy v2 is used, details
 [here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/caddy_v2).</br>
 
 `Caddyfile`
-```
+```php
 grafana.{$MY_DOMAIN} {
     reverse_proxy grafana:3000
 }
@@ -226,6 +225,10 @@ grafana.{$MY_DOMAIN} {
 push.{$MY_DOMAIN} {
     reverse_proxy pushgateway:9091
 }
+
+# prom.{$MY_DOMAIN} {
+#     reverse_proxy prometheus:9090
+# }
 ```
 
 ## Prometheus configuration
@@ -234,10 +237,9 @@ push.{$MY_DOMAIN} {
 
 [Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
 
-A config file for prometheus, bind mounted in to prometheus container.
-
+A config file for prometheus, bind mounted in to prometheus container.<br>
 Of note is **honor_labels** set to true,
-which makes sure that **conflicting labels** like `job`, set during push
+which sets that **conflicting labels** like `job`, set during push
 are kept over labels set in `prometheus.yml` for the scrape job.
 [Docs](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config).
 
@@ -261,10 +263,11 @@ scrape_configs:
 
 ## Grafana configuration
 
-* first run login with admin/admin
-* in Preferences > Datasources set `http://prometheus:9090` for url<br>
-  save and test should be green<br>
-* once some values are pushed to prometheus, create a new dashboard...
+* First run login with admin/admin.
+* In Preferences > Datasources set `http://prometheus:9090` for url<br>
+  save and test should be green
+* Once some metrics are pushed to prometheus,
+  they should be searchable in Explore section in Grafana.
 
 ![prometheus_working_pic_confirmation](https://i.imgur.com/hO8eERV.png)
 
@@ -276,13 +279,15 @@ scrape_configs:
 <details>
 <summary><h1>Learning in small steps</h1></summary>
 
+A section written during first testing
+
 what should work at this moment
 
 * \<docker-host-ip>:3000 - grafana
 * \<docker-host-ip>:9090 - prometheus 
 * \<docker-host-ip>:9091 - pushgateway 
 
-### learning and testing how to push data to pushgateway
+### Learning and testing how to push data to pushgateway
 
 * metrics must be floats
 * naming [convention](https://prometheus.io/docs/practices/naming/)
@@ -302,9 +307,10 @@ The "\`n" in the `$body` is to simulate it in windows powershell.
 
 Also in powershell the grave(backtick) character - \` 
 is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
-Here it is used to escape new line. This allows breaking the command
-in to multiple easier to read lines.<br>
-This is not related to the previous issue of line endings.
+Here it is also used to escape new line. This allows breaking a command
+in to multiple easier to read lines.
+Though it caused issues, introducing space where it should not be,
+thats why `-uri` is always full length in the final script<br>
 
 `test.ps1`
 ```ps1
@@ -360,20 +366,32 @@ So theres proof of concept of being able to send data to pushgateway and visuali
 
 # The powershell script
 
+![script_pic](https://i.imgur.com/0u6ebWn.png)
+
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
 The script itself should be pretty informative with the comments in it.<br>
 
+<details>
+<summary>**Changelog**</summary>
+
+* v0.3 in development
+  * huge rewrite
+* v0.2
+  * added pushing of repository disk usage info
+  * changed metrics name to include units
+  * general cleanup
+* v0.1 - the initial script
+
+</details>
+
 #### Get-VBRJob and Get-VBRComputerBackupJob
 
-Seems that in the past just `Get-VBRJob` was used to get job info.<br>
-But veeam is warning with every use of this cmdlet that it will no longer
-be returning agent-based backup jobs.
-So to not be investing time in to old tech, the script uses
+Veeam is now warning with every use of `Get-VBRJob` cmdlet,
+that in the future versions it will not be returning agent-based backup jobs.
+So to avoid tech debt, the script uses
 `Get-VBRComputerBackupJob` and `Get-VBRComputerBackupJobSession`
-and got bigger and messier because of it, but it's ready for that future.
-Though the cmdlets will likely be subjected to some changes
-as they feel poorer than the existing ones. 
+and got bigger and messier because of it, but should be more ready for that future.
 
 #### Job result codes
 
@@ -384,75 +402,59 @@ as they feel poorer than the existing ones.
 * -11 =  running full backup or full synthetic backup
 * 99 = disabled or not scheduled
 
-The double digit ones are addition by the script. 
-Also for agent based backups there needed to be rewrite of their values,
+The double digit ones are addition by the script.<br> 
+Also agent based backups needed a rewrite of their values,
 as they used different ones.
 
 #### Job run visualization
 
-To show backup run in status graph, the reported job result is -1 or -11 if 
-backup ended anywhere within the last hour.
-This means that even 5 minutes long backups are visualized as if they took up 
-an hour.
+To better show backup run the script checks when the job ended,
+if it was within the last hour, the result is set to `-1` or `-11`.<br>
+This means that even 5 minutes long backups are visualized, but might seem
+as if they took up an hour.
 
 #### Data size and Backup size
 
-* Data size - The size of the data being backedup up.<br>
+* Data size - The size of the data being backedup.<br>
   There is an issue of being unable to get the correct size for agent based
   backups that target specific folders. If the backup target would be 
-  entire machine or a partition the data would be correct.<br>
-  To get at least some size approximation the size of the last vbk file
-  multiplied by `1.3` is used in the report. 
-* Backup size - the combined size all backups of the job.
+  entire machine or a partition, the data would be correct.<br>
+  To get at least some approximation, the size of the last vbk file
+  multiplied by `1.3` is used in the report.
+  `1.3` to account for some compression and deduplication.
+* Backup size - the combined size of all backups of the job.
+
 
 # DEPLOY.cmd file
 
-The file that eases the installation process
+To ease the deployment.
 
 * Download [this repo.](https://github.com/DoTheEvo/veeam-prometheus-grafana/archive/refs/heads/main.zip)
 * Extract.
-* Run `DEPLOY.cmd` as administrator.
-* Edit `C:\Scripts\veeam_prometheus_info_push.ps1`
-  to change the `group` name and `base_url`.
+* Edit `veeam_prometheus_info_push.ps1`<br>
+  set `$BASE_URL` and `$GROUP` name.
+* Run `DEPLOY.cmd` as an administrator.
 * Done.
 
 What happens under the hood:
 
-* DEPLOY.cmd - checks if its run as an administrator, ends if not
-* DEPLOY.cmd - creates directory C:\Scripts if it does not existing
-* DEPLOY.cmd - checks if the script already exists, if it does
-               renames it with random suffix
-* DEPLOY.cmd - copies veeam_prometheus_info_push.ps1 in to C:\Scripts
-* DEPLOY.cmd - imports taskscheduler xml task named veeam_prometheus_info_push
+* DEPLOY.cmd - checks if it runs as an administrator, ends if not.
+* DEPLOY.cmd - creates directory `C:\Scripts` if it does not exists.
+* DEPLOY.cmd - checks if the script already exists, if it does,
+               renames it by adding a random suffix.
+* DEPLOY.cmd - copies veeam_prometheus_info_push.ps1 in to `C:\Scripts`.
+* DEPLOY.cmd - imports taskscheduler xml task named veeam_prometheus_info_push.
 * TASKSCHEDULER - the task executes every 30 minutes, at xx:15 and xx:45,
-                  with random delay of 30 seconds
-* TASKSCHEDULER - that task runs with the highest privileges as user - SYSTEM (S-1-5-18)
-* DEPLOY.cmd - enables powershell scripts execution on that windows PC
-* DEPLOY.cmd - `Unblock-File` to allow run script not created localy
-
-### Script Change log
-* v0.3 in development
-  * huge rewrite
-* v0.2
-  * added pushing of repository disk usage info
-  * changed metrics name to include units
-  * general cleanup
-* v0.1 - the initial script
+                  with random delay of 30 seconds.
+* TASKSCHEDULER - the task runs with the highest privileges as user - SYSTEM (S-1-5-18).
+* DEPLOY.cmd - enables powershell scripts execution on that windows PC.
+* DEPLOY.cmd - `Unblock-File` to allow the script execution when not created localy.
 
 # Pushgateway
 
 ![pic_pushgateway](https://i.imgur.com/64Fqzfd.png)
 
-Ideally one uses a subdomain and https for pushgateway, for that:
-
-* Have subdomain `push.example.com` and DNS record aiming at the servers public IP
-* Use [caddy](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/caddy_v2)
-  as a reverse proxy. It is completely in charge of traffic coming on 80 and 443.<br>
-  The rule from the reverse proxy section in this Readme applies,
-  so if something comes at `push.example.com` it gets redirected to
-  container named pushgateway and port 9091.
-* The `$base_url` in the script is `https://push.example.com`
-* Should now work.
+On Pushgateway url one can easily check last pushed data.
 
 To delete all data from pushgateway
 
@@ -460,11 +462,11 @@ To delete all data from pushgateway
 * `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 * `curl -X PUT https://push.example.com/api/v1/admin/wipe`
 
-### periodily wiping clean the pushgateway
+#### periodily wiping clean the pushgateway
 
 Without any action the pushed metrics sit on the pushgateway forever.
 [This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
-To better visualize possible lack of new reports coming from the machines,
+To better visualize possible lack of new reports coming from machines,
 it be wise to wipe the pushgateway clean daily.
 
 For this the dockerhost can have a simple systemd service and a timer.
@@ -501,10 +503,10 @@ In the compose file the data retention is set to 45 days.
 
 * `--storage.tsdb.retention.time=45d`
 
-Not much really to do once it runs. Checking values and deleting them I guess.<br>
-You can access its web interface from LAN side with `<dockerhost>:9090`, or
-you can setup web access to it from the outside if you wish.
-Same process as with pushgateway or any other webserver accessible through caddy.
+Not much really to do once it runs. Checking values can be done through grafana,
+and for deletion one needs to use api.<br>
+But still, one can access its web gui from LAN side with `<dockerhost>:9090`,
+or can setup web access to it from the outside like for grafana and pushgateway.
 
 [Official documentation on queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 
@@ -529,14 +531,12 @@ Theres no white space in the query, so dots are used.
 
 # Grafana dashboard
 
-Queries in grafana have a type - Range or Instant.
-Range being the default, returns data from period currently set on the dashboard,
-like last 24 hours, or last 14 days.<br>
-There is a danger in this, as some failure could stop backup reporting
-and if a check of the dashboard happens two or three weeks later when data
-moved on, there would be no indication that a job even existed.<br>
-Grafana alerts or prometheus alerts can address this,
-or hardcoding the time range of several months in to queries.
+Grafana usually shows graphs in a time range, like last 24 hours, or last 14 days.
+This can be set in the top right corner of the dashboard.
+There is a danger that a failure could stop reporting status, and if a check
+of the dashboard would happen two weeks later, and grafana is showing last 7 days
+there be no indication that a job even existed.<br>
+Grafana alerts or prometheus alerts can address this.
 
 ![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
 
@@ -550,8 +550,8 @@ The first panel is for seeing last X days backup history, at quick glance
   `veeam_job_result_info{job="veeam_job_report"}`
 * Query options > Min interval = 1h<br>
   This sets the "resolution" of status history panel,<br>
-  but data are renewed only every 30min unless scheduled task changed.<br>
-  During the first setup something smaller like 10min works well.
+  but data are renewed by default only every 30min.<br>
+  During the first setup something smaller like 10min looks good.
 * two ways to have nice labels
   * Query > Options > Legend > switch from `Auto` to `Custom`<br>
     Legend = `{{name}} | {{group}}`
@@ -684,3 +684,8 @@ This panel is a table with more details about jobs.
 To set the dashboard to be shown right away when visiting the domain
 
 * User (right top corner) > Profile > Home Dashboard > Set > Save
+
+
+# Grafana alerts
+
+some day
