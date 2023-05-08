@@ -6,12 +6,6 @@
 
 -----------------
 
-**WORK IN PROGRESS**<br>
-**WORK IN PROGRESS**<br>
-**BUT ALMOST THERE**
-
----------------
-
 # Purpose
 
 Centralized **monitoring dashboard** for Veeam B&R community edition backups.<br>
@@ -42,14 +36,14 @@ in to prometheus. Grafana **dashboard** then visualizes the gathered information
 * [Official documentation](https://helpcenter.veeam.com/docs/backup/vsphere/backup.html)
 
 For Hyper-V / VMware.<br>
-Veeam has admin credentails for the hypervisor,
-it initiates the backup process at schedule, creates a snapshot of a VM,
-process the VM's data, copies them in to a repository.<br>
-VM's data are stored in a single file, `vkb` for full backup,
+Veeam has admin credentails for the hypervisor.
+It initiates the backup process at schedule, creates a snapshot of a VM,
+process the VM's data, copies them in to a repository, deletes the snapshot.<br>
+VM's data are stored in a single file, `vbk` for full backup,
 `vib` for incremental backup.<br>
 Veeam by default creates weekly
 [synthetic full backup,](https://helpcenter.veeam.com/docs/backup/vsphere/synthetic_full_hiw.html)
-which combines `vib` files in to a new standalone `vbk`.
+which combines previous backups in to a new standalone `vbk`.
 
 #### Fileshare backup
 
@@ -58,7 +52,7 @@ which combines `vib` files in to a new standalone `vbk`.
 For network shares, called also just `File Backup`.<br>
 Differs from VM backup in a way files are stored, no vbk and vib files,
 but bunch of `vblob` files.<br>
-Also long term retention requires an archive repository,
+Also, long term retention requires an archive repository,
 not available in free version.
 
 #### Agent backup - Managed by server 
@@ -69,7 +63,7 @@ For physical machines, intented for the ones that run 24/7
 and should be always accessible by Veeam.<br>
 Very similar to VMs backup. The VBR server initiates the backup,
 the agent that is installed on the machine creates VSS snapshot,
-and data end up in a repository, either in a `vkb` file or `vib` file.
+and data end up in a repository, either in a `vbk` file or `vib` file.
 
 #### Agent backup - Managed by agent - Backup policy
 
@@ -78,16 +72,14 @@ and data end up in a repository, either in a `vkb` file or `vib` file.
 Intended for use with workstations that dont have regular connectivity
 with the VBR server. VBR installs an agent on the machine,
 hands it XML configuration, a **backup policy**, that tells it how and where
-to regularly backup and then its hands off, agent is in charge.<br>
+to regularly backup and then its hands off, the agent is in charge.<br>
 Veeam periodically tries to sync the current policy settings with the already
 deployed agents during protection group rescans.
 
-This one is bit tricky to monitor. In job history there is a track record
-of what went on, but the policy updates are poisoning it.
+This one was bit tricky to monitor, as job's history contains not just backup
+sessions, but also the policy updates.
 Some extra steps are taken in powershell script to get backup runs without
-policy updates. But as of writting this, there is not yet long enough and
-varied enough test cases to have full confidence.<br>
-So better keep a closer eye on endpoint policy backups.
+policy updates.
 </details>
 
 ---
@@ -97,8 +89,8 @@ So better keep a closer eye on endpoint policy backups.
 <summary><h1>Prometheus and Grafana Setup</h1></summary>
 
 [Here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/prometheus_grafana_loki)
-is a separate guide-by-example for monitoring docker containers with
-Prometheus Grafana Loki. Might be useful too.
+is a guide-by-example for monitoring using Prometheus, Grafana, Loki.
+Might be useful as it goes in to more details.
 
 ## Files and directory structure
 
@@ -204,8 +196,8 @@ GF_USERS_ALLOW_SIGN_UP=false
 #GF_DATE_FORMATS_INTERVAL_DAY = dddd
 ```
 
-In the `.env` above, there are two settings for grafana commented out.
-Uncomment if prefering seeing days of the week on the X axis instead of exact date.
+In the `.env` above, there are two date settings for grafana commented out.
+Uncomment to show name of days in the week on the X axis instead of exact date.
 
 **All containers must be on the same network**.</br>
 Which is named in the `.env` file.</br>
@@ -217,8 +209,8 @@ If one does not exist yet: `docker network create caddy_net`
 
 A config file for prometheus, bind mounted in to the prometheus container.<br>
 Of note is **honor_labels** set to true,
-which sets that **conflicting labels** like `job`, set during push
-are kept over labels set in `prometheus.yml` for the scrape job.
+which means that **conflicting labels** like `job`, set during push
+are kept over labels set by `prometheus.yml` for that scrape job.
 [Docs](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config).
 
 `prometheus.yml`
@@ -262,8 +254,8 @@ push.{$MY_DOMAIN} {
 ## Grafana configuration
 
 * First run login with admin/admin.
-* In Preferences > Datasources set `http://prometheus:9090` for url<br>
-  save and test should be green
+* In Preferences > Datasources set `http://prometheus:9090` for url.<br>
+  Save and test should be green.
 * Once some metrics are pushed to prometheus,
   they should be searchable in Explore section in Grafana.
 
@@ -290,13 +282,13 @@ what should work at this moment
 * metrics must be floats
 * naming [convention](https://prometheus.io/docs/practices/naming/)
   is to end the metric names with units
-* labels are used to pass strings in the url
+* labels in url are used to pass strings info and to mark the metrics
 * The idea what
  [job and instance](https://prometheus.io/docs/concepts/jobs_instances/) represent.
   In pushgateway I guess the job is still just overal main idea
   and instance is about final undivisable target. Final in sense that if taking disk
   usage data, do you put computer name as instance which can have multiple disk,
-  or the disk themselves as instance? IMO the disk..
+  or the disk themselves as instance? IMO the disk.. but what about partitions?
 
 
 Prometheus requires linux [line endings.](
@@ -308,7 +300,8 @@ is for [escaping stuff](https://ss64.com/ps/syntax-esc.html)<br>
 Here it is also used to escape new line. This allows breaking a command
 in to multiple easier to read lines.
 Though it caused issues, introducing space where it should not be,
-thats why `-uri` is always full length in the final script<br>
+thats why `-uri` is always full length in the final script.
+God damn fragile powershell.
 
 `test.ps1`
 ```ps1
@@ -355,7 +348,8 @@ should look in the end somewhat like this
 this command deletes all metrics on prometheus, assuming api is enabled<br>
 `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
 
-So theres proof of concept of being able to send data to pushgateway and visualize them in grafana
+So theres the proof of concept of being able to send data to pushgateway
+and visualize them in grafana
 
 </details>
 
@@ -472,6 +466,7 @@ To better visualize possible lack of new reports coming from machines,
 it be wise to wipe the pushgateway clean daily.
 
 For this the dockerhost can have a simple systemd service and a timer.
+In `/etc/systemd/system/`
 
 `pushgateway_wipe.service`
 ```ini
@@ -538,7 +533,7 @@ The json file in this repo can be imported in to grafana.
 * [VBR_dashboard.json](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/VBR_dashboard.json)
 * Dashboards > New > Import > paste json
 
-There are also steps to recreate it from scratch.
+For steps to recreate it from scratch:
 
 ![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
 
