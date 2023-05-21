@@ -589,6 +589,8 @@ Theres no white space in the query, so dots are used.
 
 # Grafana dashboard
 
+![dashboard](https://i.imgur.com/FjpN76I.png)
+
 The json file in this repo can be imported in to grafana.
 
 * [VBR_dashboard_v2.json](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/VBR_dashboard_v2.json)
