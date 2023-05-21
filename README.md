@@ -484,7 +484,8 @@ To ease the deployment.
 * Run `DEPLOY.cmd` as an administrator.
 * Done.
 
-What happens under the hood:
+<details>
+<summary>What happens under the hood:</summary>
 
 * DEPLOY.cmd - checks if it runs as an administrator, ends if not.
 * DEPLOY.cmd - creates directory `C:\Scripts` if it does not exists.
@@ -498,6 +499,8 @@ What happens under the hood:
 * DEPLOY.cmd - enables powershell scripts execution on that windows PC.
 * DEPLOY.cmd - `Unblock-File` to allow the script execution when not created localy.
 
+</details>
+
 # Pushgateway
 
 ![pic_pushgateway](https://i.imgur.com/64Fqzfd.png)
@@ -510,14 +513,18 @@ To delete all data from pushgateway
 * `curl -X PUT 10.0.19.4:9091/api/v1/admin/wipe`
 * `curl -X PUT https://push.example.com/api/v1/admin/wipe`
 
-#### periodily wiping clean the pushgateway
+### Periodily wiping clean the pushgateway
 
 Without any action the pushed metrics sit on the pushgateway **forever**.
 [This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
-To better visualize possible lack of new reports coming from machines,
+To better visualize possible lack of new reports coming in,
 it be wise to wipe the pushgateway clean daily.
 
 For this the dockerhost can have a simple systemd service and a timer.
+
+<details>
+<summary>How to setup systemd pushgateway_wipe.service</summary>
+
 In `/etc/systemd/system/`
 
 `pushgateway_wipe.service`
@@ -543,6 +550,8 @@ WantedBy=timers.target
 ```
 
 enable the timer: `sudo systemctl enable pushgateway_wipe.timer`
+
+</details>
 
 # Prometheus
 
