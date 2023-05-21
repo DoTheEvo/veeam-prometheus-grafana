@@ -139,7 +139,7 @@
         "y": 0
       },
       "id": 1,
-      "interval": "10m",
+      "interval": "30m",
       "options": {
         "colWidth": 0.9,
         "legend": {
@@ -438,7 +438,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": " veeam_job_data_size_bytes{job=\"veeam_job_report\"}",
+          "expr": "veeam_job_data_size_bytes{job=\"veeam_job_report\"}",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -451,7 +451,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": " veeam_job_backup_size_bytes{job=\"veeam_job_report\"}",
+          "expr": "veeam_job_backup_size_bytes{job=\"veeam_job_report\"}",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -490,7 +490,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": " round(time()-veeam_job_end_time_timestamp_seconds{job=\"veeam_job_report\"})",
+          "expr": "time()-last_over_time(veeam_job_end_time_timestamp_seconds{job=\"veeam_job_report\"}[30d])",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -503,7 +503,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": " round(time()-push_time_seconds{job=\"veeam_job_report\"})",
+          "expr": "time()-last_over_time(push_time_seconds{job=\"veeam_job_report\"}[30d])",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -651,7 +651,7 @@
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-5d",
     "to": "now"
   },
   "timepicker": {},

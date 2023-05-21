@@ -120,7 +120,7 @@ The directories are created by docker compose on the first run.
 Three containers to spin up.</br>
 
 * **Prometheus** - prometheus server, pulling, storing, evaluating metrics.
-* **Pushgateway** - web server ready to receive pushed information on an open port.
+* **Pushgateway** - web server ready to receive pushed information.
 * **Grafana** - web GUI visualization of the collected metrics in nice dashboards.
 
 Of note for prometheus container is **data retention** set to 45 days,
@@ -152,7 +152,7 @@ services:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:9.5.1
+    image: grafana/grafana:9.5.2
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -190,26 +190,34 @@ TZ=Europe/Bratislava
 GF_SECURITY_ADMIN_USER=admin
 GF_SECURITY_ADMIN_PASSWORD=admin
 GF_USERS_ALLOW_SIGN_UP=false
-
+GF_SERVER_ROOT_URL=https://grafana.example.com
+# GRAFANA EMAIL SETTINGS
+GF_SMTP_ENABLED=true
+GF_SMTP_HOST=smtp-relay.sendinblue.com:587
+GF_SMTP_USER=example@gmail.com
+GF_SMTP_PASSWORD=xzu0dfFhn3eqa
+startTLS_policy=NoStartTLS
+# GRAFANA CUSTOM SETTINGS
 # DATE FORMATS SWITCHED TO NAMES OF THE DAYS OF THE WEEK
 #GF_DATE_FORMATS_INTERVAL_HOUR = dddd
 #GF_DATE_FORMATS_INTERVAL_DAY = dddd
 ```
 
-In the `.env` above, there are two date settings for grafana commented out.
-Uncomment to show name of days in the week on the X axis instead of exact date.
-
-**All containers must be on the same network**.</br>
-Which is named in the `.env` file.</br>
+The containers must be on a **custom named docker network**,
+along with caddy reverse proxy. This allows **hostname resolution**.</br>
+The network name is set in the `.env` file, in `DOCKER_MY_NETWORK` variable.</br>
 If one does not exist yet: `docker network create caddy_net`
 
-### prometheus.yml
+In the `.env` file, there are also two date settings for grafana commented out.
+Uncomment to show full name of days in the week instead of exact date.<br>
+
+## prometheus.yml
 
 [Official documentation.](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
 
 A config file for prometheus, bind mounted in to the prometheus container.<br>
 Of note is **honor_labels** set to true,
-which means that **conflicting labels** like `job`, set during push
+which means that **conflicting labels**, like `job`, set during push
 are kept over labels set by `prometheus.yml` for that scrape job.
 [Docs](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config).
 
@@ -286,9 +294,7 @@ what should work at this moment
 * The idea what
  [job and instance](https://prometheus.io/docs/concepts/jobs_instances/) represent.
   In pushgateway I guess the job is still just overal main idea
-  and instance is about final undivisable target. Final in sense that if taking disk
-  usage data, do you put computer name as instance which can have multiple disk,
-  or the disk themselves as instance? IMO the disk.. but what about partitions?
+  and instance is about final unique, err instance.
 
 
 Prometheus requires linux [line endings.](
@@ -351,6 +357,54 @@ this command deletes all metrics on prometheus, assuming api is enabled<br>
 So theres the proof of concept of being able to send data to pushgateway
 and visualize them in grafana
 
+### Prometheus and PromQL basics
+
+My understanding of this shit.. 
+
+* Prometheus stores metrics, each metric has a name, like `cpu_temp`.
+* the metrics values are stored as time series, just simple - timestamped values<br>
+  `[43 @1684608467][41 @1684608567][48 @1684608667]`.
+* This metric has labels `[name="server-19", state="idle", city="Frankfurt"]`.<br>
+  These allow targeting the data.
+
+Queries to retrieve metrics.
+
+* `cpu_temp` - simmple query will show values over whatever time period
+is selected in the interface.
+* `cpu_temp{state="idle"}` - will narrow down results by applying a label.<br>
+  `cpu_temp{state="idle", name="server-19"}` - multiple labels narrow down results.
+
+A query can return various data type, kinda tricky concept is difference between
+these two:
+
+* **instant vector** - returns a single value with a single timestamp. It is
+  simple and intuitive. All the above examples are instant vectors.<br>
+  Of note, there is no thinking about time range here. That is few layers above,
+  if one picks last 1h or last 7 days... that plays no role here,
+  this is a query datatype and it is still instant query - single value in
+  point of time.
+
+* **range vector** - returns multiple values with a single timestamp<br>
+  This is used by [query functions](https://prometheus.io/docs/prometheus/latest/querying/functions).<br>
+  A useless example would be `cpu_temp[10m]`. This query first looks at the last
+  timestamp data, then it would take all data points within the previous 10m
+  before that one timestamp, and return all those values.
+  This colletion would have a single timestamp.
+  This functionality allows use of various functions that can do complex tasks.<br> 
+  Actual example of range vector would be `changes(cpu_temp[10m])` where the function
+  [changes\(\)](https://prometheus.io/docs/prometheus/latest/querying/functions/#changes)
+  would take that range vector info, look at those 10min of data
+  and return a single value, telling how many times the value
+  of that metric changed in those 10 min.
+
+Links
+
+* [Stackoverflow - Prometheus instant vector vs range vector](https://stackoverflow.com/questions/68223824/prometheus-instant-vector-vs-range-vector)
+* [The Anatomy of a PromQL Query](https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/)
+* [Prometheus Cheat Sheet - Basics \(Metrics, Labels, Time Series, Scraping\)](https://iximiuz.com/en/posts/prometheus-metrics-labels-time-series/)
+* [Learning Prometheus and PromQL - Learning Series](https://iximiuz.com/en/series/learning-prometheus-and-promql/)
+* [The official](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+
 </details>
 
 ---
@@ -365,13 +419,13 @@ and visualize them in grafana
 The script itself should be pretty informative with the comments in it.<br>
 
 Tested with VBR **v12**<br>
-Might work with v11, except for agent-based backups as there are bugs
-in the new cmdlets in that version.
+Might work with v11, except for agent-based backups as there were bugs
+in new cmdlets in that version.
 
 <details>
 <summary>Changelog</summary>
 
-* v0.3 in development
+* v0.3
   * huge rewrite
 * v0.2
   * added pushing of repository disk usage info
@@ -383,8 +437,8 @@ in the new cmdlets in that version.
 
 #### Get-VBRJob and Get-VBRComputerBackupJob
 
-Veeam is now warning with every use of `Get-VBRJob` cmdlet,
-that in the future versions it will not be returning agent-based backup jobs.
+Veeam is now warning with every use of `Get-VBRJob` cmdlet that 
+future versions will not be returning agent-based backup jobs.
 So to avoid tech debt, the script uses
 `Get-VBRComputerBackupJob` and `Get-VBRComputerBackupJobSession`
 and got bigger and messier because of it, but should be more ready for that future.
@@ -406,8 +460,7 @@ as they used different ones.
 
 To better show backup run the script checks when the job ended,
 if it was within the last hour, the result is set to `-1` or `-11`.<br>
-This means that even 5 minutes long backups are visualized, but might seem
-as if they took up an hour.
+This visualization is not precise and is often shifted one time block in time.
 
 #### Data size and Backup size
 
@@ -419,7 +472,6 @@ as if they took up an hour.
   multiplied by `1.3` is used in the report.
   `1.3` to account for some compression and deduplication.
 * Backup size - the combined size of all backups of the job.
-
 
 # DEPLOY.cmd file
 
@@ -460,7 +512,7 @@ To delete all data from pushgateway
 
 #### periodily wiping clean the pushgateway
 
-Without any action the pushed metrics sit on the pushgateway forever.
+Without any action the pushed metrics sit on the pushgateway **forever**.
 [This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
 To better visualize possible lack of new reports coming from machines,
 it be wise to wipe the pushgateway clean daily.
@@ -519,7 +571,7 @@ To delete all metrics on prometheus
 
   * `curl -X POST -g 'http://10.0.19.4:9090/api/v1/admin/tsdb/delete_series?match[]={__name__=~".*"}'`
 
-To delete metrics based off instance or group
+To delete metrics of an instance or group
 
 * `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={instance=~"^Backup.Copy.Job.*"}'`
 * `curl -X POST -g 'https://prom.example.com/api/v1/admin/tsdb/delete_series?match[]={group=~"CocaCola"}'`
@@ -530,10 +582,16 @@ Theres no white space in the query, so dots are used.
 
 The json file in this repo can be imported in to grafana.
 
-* [VBR_dashboard.json](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/VBR_dashboard.json)
+* [VBR_dashboard_v2.json](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/VBR_dashboard_v2.json)
 * Dashboards > New > Import > paste json
 
-For steps to recreate it from scratch:
+Changelog
+
+* v2 - changed the initial time ranges, fixed last run and last report times
+* v1 - the initial dashboard 
+
+<details>
+<summary><h1>Steps to manually recreate dashboard</h1></summary>
 
 ![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
 
@@ -643,9 +701,9 @@ This panel is a table with more details about jobs.
      - veeam_job_start_time_timestamp_seconds{job="veeam_job_report"}
      ```
   * `last_job_run`<br>
-    `round(time()-veeam_job_end_time_timestamp_seconds{job="veeam_job_report"})`
+    `time()-last_over_time(veeam_job_end_time_timestamp_seconds{job="veeam_job_report"}[30d])`
   * `last_report`<br>
-    `round(time()-push_time_seconds{job="veeam_job_report"})`
+    `time()-last_over_time(push_time_seconds{job="veeam_job_report"}[30d])`
 * Now the results are there in many tables, switchable from a drop down menu,
   but they need to be combined in to one table.
 * Transform > Join by field > Mode = OUTER; Field = instance
@@ -689,9 +747,11 @@ This panel is a table with more details about jobs.
     * `Gradient`
 * Save and look.
 * Adjusting column width will be creating overrides for that column.<br>
-  Just to be aware, as it might be weird seeing like 12 owerrides afterwards.
+  Just to be aware, as it might be weird seeing like 12 overrides afterwards.
 
+</details>
 
+----
 ----
 
 To set the dashboard to be shown right away when visiting the domain
@@ -701,10 +761,207 @@ To set the dashboard to be shown right away when visiting the domain
 
 # Grafana alerts
 
-Grafana alerts help with the reliability and danger of failure going unnoticed. 
+![email_alert](https://i.imgur.com/Y01YoBw.png)
 
-Grafana usually shows graphs in a time range, like last 24 hours,
-or last 14 days. There is a danger that a failure could occur, and if a check
-of the dashboard would happen two weeks later, and grafana is showing last 7 days
-there be no indication that a job even existed.<br>
+Grafana alerts help with the reliability and danger of a failure going unnoticed.<br>
+Especially considering the dynamic nature of this setup, meaning that if reporting
+stops for any reason, after some time there is no indication that a job
+even existed, let alone failed.
 
+Before getting to alerts, first the delivery mechanism and policy.
+
+### Contact points
+
+Grafana > Alerting > Contact points
+
+##### email
+
+Just needs corectly set some smtp stuff in the `.env` file for grafana,
+as can be seen in the setup section.<br>
+The contact point already exists, named `grafana-default-email`.<br>
+Can be tested if it actually works when editing the contact point.
+
+
+##### ntfy
+
+Push notifications for a phone or desktop using selfhosted [ntfy](https://ntfy.sh/).<br>
+Detailed setup of running ntfy as a docker container
+[here.](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/gotify-ntfy-signal#grafana-to-ntfy)<br>
+
+* New contact point
+* Name = `ntfy`
+* Integration = `Webhook`
+* URL = `https://ntfy.example.com/veeam`<br>
+  or if grafana-to-ntfy is already setup on the same docker network,
+  then URL = `http://grafana-to-ntfy:8080`
+* plain ntfy does not need credentials,<br>
+  grafana-to-ntfy needs the ones from its `.env` file set.
+* Disable resolved message = check
+* Test
+* Save
+
+Issue I noticed now in testing with ntfy, is that if you get multiple failures
+it wont deliver. Could be solved by not letting it send the complex grafana
+json full of dynamic values, but just some generic static text about a failure.<br>
+Will eventually look in to it, or report it to the dev.
+
+### Notification policies 
+
+Editing the `Default policy`, making sure the contact point is the correct one
+is enough if just one contact point is planned to be used. Like just email.
+
+Of note are `Timing options` inside policy, that sets how often a firing alarm
+will resend notification. Default is 4h, +5m for group interval.
+
+To fire notification on multiple contact points,
+for alerts in `veeam_alerts` folder:
+
+* Within the `Default policy` adding `+ New nested policy`.
+* Matching labels: `grafana_folder` `=` `veeam_alerts`<br>
+  Select `Contact point` - `grafana-default-email`<br>
+  Enable - `Continue matching subsequent sibling nodes`<br>
+  Which means that after matching, it will continue to look for 
+  other policies that would also match
+* Do the same again for a new nested policy, but use contact point to `ntfi`.
+
+The `Default policy` is applied only if no other policy fits.
+
+## Alerts
+
+Currently these alerts are not long term tested.<br>
+They should work, but should be considered in development.
+
+<details>
+<summary><h3>Alert rule - Backup Failed or Warning</h3></summary>
+
+- **1 Set an alert rule name**
+  - Rule name = `veaam_backup_failed_or_warning`
+- **2 Set a query and alert condition**
+  - **A** - Prometheus; set Last 2d
+    - Options > Min step = 15m
+    - switch from builder to code
+    - `veeam_job_result_info{job="veeam_job_report"}`
+  - **B** - Reduce
+    - Function = Last
+    - Input = A
+    - Mode = Strict
+  - **C** - Treshold
+    - Input = B
+    - is within range 0 to 3 (it's [not inclusive](https://github.com/grafana/grafana/issues/19193))
+    - Make this the alert condition
+- **3 Alert evaluation behavior**
+  - Folder = "veeam_alerts"
+  - Evaluation group (interval) = "one_hour"<br>
+  - Evaluation interval = 1h
+  - For = 0s
+  - Configure no data and error handling
+    - Alert state if no data or all values are null = OK
+- **4 Add details for your alert rule**
+  - Metrics labels can be used here
+- **5 Notifications**
+  - nothing
+- Save and exit
+
+</details>
+
+<details>
+<summary><h3>Alert rule - Repo is 85% full</h3></summary>
+
+- **1 Set an alert rule name**
+  - Rule name = `veaam_repo_full`
+- **2 Set a query and alert condition**
+  - **A** - Prometheus; set Last 2d
+    - Options > Min step = 15m
+    - switch from builder to code
+      ```
+      (veeam_repo_total_size_bytes{job="veeam_repo_report"}
+      - veeam_repo_free_space_bytes{job="veeam_repo_report"})
+      / ((veeam_repo_total_size_bytes{job="veeam_repo_report"}) /100)
+      ```
+  - **B** - Reduce
+    - Function = Last
+    - Input = A
+    - Mode = Strict
+  - **C** - Treshold
+    - Input = B
+    - is above `84`
+    - Make this the alert condition
+- **3 Alert evaluation behavior**
+  - Folder = "veeam_alerts"
+  - Evaluation group (interval) = "one_hour"<br>
+  - Evaluation interval = 1h
+  - For = 0s
+  - Configure no data and error handling
+    - Alert state if no data or all values are null = OK
+- **4 Add details for your alert rule**
+  - Metrics labels can be used here
+- **5 Notifications**
+  - nothing
+- Save and exit
+
+</details>
+
+<details>
+<summary><h3>Alert rule - No report for 5 days</h3></summary>
+
+- **1 Set an alert rule name**
+  - Rule name = `veaam_noreport_five_days`
+- **2 Set a query and alert condition**
+  - **A** - Prometheus; set Last 30 days (now-30d to now)
+    - switch from builder to code
+      `time()-last_over_time(push_time_seconds{job="veeam_job_report"}[30d])`
+  - **B** - Reduce
+    - Function = Last
+    - Input = A
+    - Mode = Strict
+  - **C** - Treshold
+    - Input = B
+    - is above `432000`
+    - Make this the alert condition
+- **3 Alert evaluation behavior**
+  - Folder = "veeam_alerts"
+  - Evaluation group (interval) = "twelve_hours"<br>
+  - Evaluation interval = 12h
+  - For = 0s
+  - Configure no data and error handling
+    - Alert state if no data or all values are null = Error
+- **4 Add details for your alert rule**
+  - nothing
+- **5 Notifications**
+  - nothing
+- Save and exit
+
+</details>
+
+<details>
+<summary><h3>Alert rule - No backup done for 5 days</h3></summary>
+
+- **1 Set an alert rule name**
+  - Rule name = `veaam_nobackup_five_days`
+- **2 Set a query and alert condition**
+  - **A** - Prometheus; set Last 30 days (now-30d to now)
+    - switch from builder to code
+      `time()-last_over_time(veeam_job_end_time_timestamp_seconds{job="veeam_job_report"}[30d])`
+  - **B** - Reduce
+    - Function = Last
+    - Input = A
+    - Mode = Strict
+  - **C** - Treshold
+    - Input = B
+    - is above `432000`
+    - Make this the alert condition
+- **3 Alert evaluation behavior**
+  - Folder = "veeam_alerts"
+  - Evaluation group (interval) = "twelve_hours"<br>
+  - Evaluation interval = 12h
+  - For = 0s
+  - Configure no data and error handling
+    - Alert state if no data or all values are null = Error
+- **4 Add details for your alert rule**
+  - Metrics labels can be used here<br>
+    nothing
+- **5 Notifications**
+  - nothing
+- Save and exit
+
+</details>
