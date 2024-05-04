@@ -23,7 +23,7 @@ This info gets pushed to a **prometheus pushgateway**, where it gets scraped
 in to prometheus.
 Grafana **dashboard** then visualizes the gathered information.<br>
 
-![dashboard_pic](https://i.imgur.com/9HO1ktb.png)
+![dashboard_pic](https://i.imgur.com/00xPhwQ.png)
 
 <details>
 <summary><h1>Basic info on Veeam Backup & Replication</h1></summary>
