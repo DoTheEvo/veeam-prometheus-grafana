@@ -1,4 +1,4 @@
-# v0.3  ----------------------------------------------------------------------
+# v0.4  ----------------------------------------------------------------------
 # ----------------------  CUSTOM CONFIG  -------------------------------------
 
 $GROUP = 'CocaCola'
@@ -8,6 +8,9 @@ $SERVER = $env:COMPUTERNAME # SET CUSTOM NAME IF DESIRED
 # ----------------------------------------------------------------------------
 # ----------------------  GENERIC USEFUL STUFF  ------------------------------
 # ----------------------------------------------------------------------------
+
+# ANY ERROR WILL CAUSE SCRIPT TO TERMINATE EXECUTION
+$ErrorActionPreference = "Stop"
 
 # WHEN USING HTTPS THIS FORCES TLS 1.2 INSTEAD OF POWERSHELL DEFAULT 1.0
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -126,15 +129,16 @@ if ($Job.Options.JobOptions.RunManually) { $LAST_SESSION_RESULT_CODE = 99}
 if (!$Job.IsScheduleEnabled) { $LAST_SESSION_RESULT_CODE = 99}
 
 # TO VISUALIZE WHEN THE JOB RUN HAPPENED IN GRAPH
-# AND TO DISTINGUISH RUN BEING FULL BACKUP OR A FULL SYNTHETIC BACKUP
-$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOCH
-if ($SecondsAgo -le 3600) {
-
-    # ------  JOB RUN ENDED WITHIN THE LAST HOUR  ---------
-
+$SecondsAgoFromStart = (GetUnixTimeUTC(Get-Date)) - $START_TIME_UTC_EPOCH
+if ($SecondsAgoFromStart -le 3600) {
+    # ------  JOB RUN STARTED WITHIN THE LAST HOUR  -------
     $LAST_SESSION_RESULT_CODE = -1
+}
 
-    # ------  CHECK IF FULL BACKUP  -----------------------
+# TO MARK RUN BEING A FULL BACKUP OR A FULL SYNTHETIC BACKUP
+# BECAUSE ONLY AFTER BACKUP IS DONE WE KNOW
+$SecondsAgoFromEnd = (GetUnixTimeUTC(Get-Date)) - $START_TIME_UTC_EPOCH
+if ($SecondsAgoFromEnd -le 3600) {
 
     if (WasLastRunFullActiveOrFullSynt $LastSessionTasks) {
         $LAST_SESSION_RESULT_CODE = -11
@@ -235,15 +239,16 @@ if (!$Job.ScheduleEnabled) { $LAST_SESSION_RESULT_CODE = 99}
 if (!$Job.JobEnabled) { $LAST_SESSION_RESULT_CODE = 99}
 
 # TO VISUALIZE WHEN THE JOB RUN HAPPENED IN GRAPH
-# AND TO DISTINGUISH RUN BEING FULL BACKUP OR A FULL SYNTHETIC BACKUP
-$SecondsAgo = (GetUnixTimeUTC(Get-Date)) - $STOP_TIME_UTC_EPOCH
-if ($SecondsAgo -le 3600) {
-
-    # ------  JOB RUN ENDED WITHIN THE LAST HOUR  ---------
-
+$SecondsAgoFromStart = (GetUnixTimeUTC(Get-Date)) - $START_TIME_UTC_EPOCH
+if ($SecondsAgoFromStart -le 3600) {
+    # ------  JOB RUN STARTED WITHIN THE LAST HOUR  -------
     $LAST_SESSION_RESULT_CODE = -1
+}
 
-    # ------  CHECK IF FULL BACKUP  -----------------------
+# TO MARK RUN BEING A FULL BACKUP OR A FULL SYNTHETIC BACKUP
+# BECAUSE ONLY AFTER BACKUP IS DONE WE KNOW
+$SecondsAgoFromEnd = (GetUnixTimeUTC(Get-Date)) - $START_TIME_UTC_EPOCH
+if ($SecondsAgoFromEnd -le 3600) {
 
     if (WasLastRunFullActiveOrFullSynt $LastSessionTasks) {
         $LAST_SESSION_RESULT_CODE = -11

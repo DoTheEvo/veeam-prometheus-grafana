@@ -1,4 +1,4 @@
-# Veeam B&R dashboard for prometheus
+# Veeam B&R dashboard
 
 ###### guide-by-example
 
@@ -8,8 +8,9 @@
 
 # Purpose
 
-Centralized **monitoring dashboard** for Veeam B&R community edition backups.<br>
-Though relatively easily adjusted to any backup solution.
+Centralized **monitoring dashboard** with **alerts** for Veeam B&R.<br>
+Works with community edition.
+Relatively easily adjusted to any backup solution that can report basic info.
 
 * [Veeam Backup & Replication Community Edition](
 https://www.veeam.com/virtual-machine-backup-solution-free.html)
@@ -17,9 +18,10 @@ https://www.veeam.com/virtual-machine-backup-solution-free.html)
 * [Grafana](https://grafana.com/)
 
 A **powershell script** periodically runs on machines running VBR,
-gathering information about the backup-jobs using powershell **cmdlets**.
+gathering information about backup-jobs and repositories.
 This info gets pushed to a **prometheus pushgateway**, where it gets scraped
-in to prometheus. Grafana **dashboard** then visualizes the gathered information.
+in to prometheus.
+Grafana **dashboard** then visualizes the gathered information.<br>
 
 ![dashboard_pic](https://i.imgur.com/pRuYTQF.png)
 
@@ -28,7 +30,8 @@ in to prometheus. Grafana **dashboard** then visualizes the gathered information
 
 * VBR is installed on a windows machine. Can be physical or virtual.
 * It needs a repository where to store backups.
-  Can be a local drives, network storage, cloud,..
+  Can be local drives, network storage, cloud,..
+* Job logs are in `C:\ProgramData\Veeam\Backup`
 * Various types of jobs are created that regularly run, creating backups.
 
 #### Virtual machines backup
@@ -53,7 +56,7 @@ For network shares, called also just `File Backup`.<br>
 Differs from VM backup in a way files are stored, no vbk and vib files,
 but bunch of `vblob` files.<br>
 Also, long term retention requires an archive repository,
-not available in free version.
+not available in community edition.
 
 #### Agent backup - Managed by server 
 
@@ -78,7 +81,7 @@ deployed agents during protection group rescans.
 
 This one was bit tricky to monitor, as job's history contains not just backup
 sessions, but also the policy updates.
-Some extra steps are taken in powershell script to get backup runs without
+Some extra steps are needed in the powershell script to get backup runs without
 policy updates.
 </details>
 
@@ -86,7 +89,7 @@ policy updates.
 ---
 
 <details>
-<summary><h1>Prometheus and Grafana Setup</h1></summary>
+<summary><h1>Prometheus and Grafana Setup in Docker</h1></summary>
 
 [Here](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/prometheus_grafana_loki)
 is a guide-by-example for monitoring using Prometheus, Grafana, Loki.
@@ -357,53 +360,12 @@ this command deletes all metrics on prometheus, assuming api is enabled<br>
 So theres the proof of concept of being able to send data to pushgateway
 and visualize them in grafana
 
-### Prometheus and PromQL basics
+### PromQL basics
 
-My understanding of this shit.. 
-
-* Prometheus stores metrics, each metric has a name, like `cpu_temp`.
-* the metrics values are stored as time series, just simple - timestamped values<br>
-  `[43 @1684608467][41 @1684608567][48 @1684608667]`.
-* This metric has labels `[name="server-19", state="idle", city="Frankfurt"]`.<br>
-  These allow targeting the data.
-
-Queries to retrieve metrics.
-
-* `cpu_temp` - simmple query will show values over whatever time period
-is selected in the interface.
-* `cpu_temp{state="idle"}` - will narrow down results by applying a label.<br>
-  `cpu_temp{state="idle", name="server-19"}` - multiple labels narrow down results.
-
-A query can return various data type, kinda tricky concept is difference between
-these two:
-
-* **instant vector** - returns a single value with a single timestamp. It is
-  simple and intuitive. All the above examples are instant vectors.<br>
-  Of note, there is no thinking about time range here. That is few layers above,
-  if one picks last 1h or last 7 days... that plays no role here,
-  this is a query datatype and it is still instant query - single value in
-  point of time.
-
-* **range vector** - returns multiple values with a single timestamp<br>
-  This is used by [query functions](https://prometheus.io/docs/prometheus/latest/querying/functions).<br>
-  A useless example would be `cpu_temp[10m]`. This query first looks at the last
-  timestamp data, then it would take all data points within the previous 10m
-  before that one timestamp, and return all those values.
-  This colletion would have a single timestamp.
-  This functionality allows use of various functions that can do complex tasks.<br> 
-  Actual example of range vector would be `changes(cpu_temp[10m])` where the function
-  [changes\(\)](https://prometheus.io/docs/prometheus/latest/querying/functions/#changes)
-  would take that range vector info, look at those 10min of data
-  and return a single value, telling how many times the value
-  of that metric changed in those 10 min.
-
-Links
-
-* [Stackoverflow - Prometheus instant vector vs range vector](https://stackoverflow.com/questions/68223824/prometheus-instant-vector-vs-range-vector)
-* [The Anatomy of a PromQL Query](https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/)
-* [Prometheus Cheat Sheet - Basics \(Metrics, Labels, Time Series, Scraping\)](https://iximiuz.com/en/posts/prometheus-metrics-labels-time-series/)
-* [Learning Prometheus and PromQL - Learning Series](https://iximiuz.com/en/series/learning-prometheus-and-promql/)
-* [The official](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+[Here's](https://github.com/DoTheEvo/selfhosted-apps-docker/tree/master/prometheus_grafana_loki#promql-basics)
+my basic understanding.<br>
+How prometheus stores data, how to query, difference between instant vector
+and range vector, some links.
 
 </details>
 
@@ -425,6 +387,12 @@ in new cmdlets in that version.
 <details>
 <summary>Changelog</summary>
 
+* v0.4
+  * added $ErrorActionPreference = "Stop"
+    which will terminate script's execution on any error
+  * job run time window calculation changed from the endtime to startime
+  * detection of a job being a full backup is now separate part and
+    done after the backup ends
 * v0.3
   * huge rewrite
 * v0.2
@@ -453,14 +421,14 @@ and got bigger and messier because of it, but should be more ready for that futu
 * 99 = disabled or not scheduled
 
 The double digit ones are addition by the script.<br> 
-Also agent based backups needed a rewrite of their values,
+Also agent based backups needed a rewrite of their return values,
 as they used different ones.
 
 #### Job run visualization
 
-To better show backup run the script checks when the job ended,
+To better show backup run the script checks when the job started,
 if it was within the last hour, the result is set to `-1` or `-11`.<br>
-This visualization is not precise and is often shifted one time block in time.
+This visualization is not precise and can be shifted one time block in time.
 
 #### Data size and Backup size
 
@@ -505,7 +473,7 @@ To ease the deployment.
 
 ![pic_pushgateway](https://i.imgur.com/64Fqzfd.png)
 
-On Pushgateway url one can easily check last pushed data.
+Pushed data can be checked On Pushgateway's url.
 
 To delete all data from pushgateway
 
@@ -600,6 +568,9 @@ Changelog
 
 * v2 - changed the initial time ranges, fixed last run and last report times
 * v1 - the initial dashboard 
+
+To set the dashboard to be shown right away when visiting the domain<br>
+User (right top corner) > Profile > Home Dashboard > Set > Save
 
 <details>
 <summary><h1>Steps to manually recreate dashboard</h1></summary>
@@ -764,11 +735,6 @@ This panel is a table with more details about jobs.
 
 ----
 ----
-
-To set the dashboard to be shown right away when visiting the domain
-
-* User (right top corner) > Profile > Home Dashboard > Set > Save
-
 
 # Grafana alerts
 
