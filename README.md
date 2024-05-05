@@ -426,9 +426,16 @@ as they used different ones.
 
 #### Job run visualization
 
-To better show backup run the script checks when the job started,
-if it was within the last hour, the result is set to `-1` or `-11`.<br>
-This visualization is not precise and can be shifted one time block in time.
+This visualization of runs is not precise and can be shifted some on time line,
+but it should be precise enough for general overview.
+
+Job themselves report that they are running but this can miss short running jobs.
+So in adition the script checks the last jobs start time,
+if it was within the last hour the result code is set to `-1`.
+
+We dunno if run was full backup or full syntenthic until the job is finished,
+so there is another check of last jobs end time. If it was within the last hour
+and it was full/syntenthic_full it changes the result code to `-11`.
 
 #### Data size and Backup size
 
@@ -436,9 +443,8 @@ This visualization is not precise and can be shifted one time block in time.
   There is an issue of being unable to get the correct size for agent based
   backups that target specific folders. If the backup target would be 
   entire machine or a partition, the data would be correct.<br>
-  To get at least some approximation, the size of the last vbk file
-  multiplied by `1.3` is used in the report.
-  `1.3` to account for some compression and deduplication.
+  To get at least some approximation, the size of the last vbk file is used,
+  multiplied by `1.3` to account for some compression.
 * Backup size - the combined size of all backups of the job.
 
 # DEPLOY.cmd file
@@ -485,8 +491,8 @@ To delete all data from pushgateway
 
 Without any action the pushed metrics sit on the pushgateway **forever**.
 [This is intentional.](https://github.com/prometheus/pushgateway/issues/19)<br>
-To better visualize possible lack of new reports coming in,
-it be wise to wipe the pushgateway clean daily.
+It is **essential** to wipe pushgateway clean daily to better visualize lack of
+new reports coming in.
 
 For this the dockerhost can have a simple systemd service and a timer.
 
@@ -575,7 +581,7 @@ User (right top corner) > Profile > Home Dashboard > Set > Save
 <details>
 <summary><h1>Steps to manually recreate dashboard</h1></summary>
 
-![panel-status-history](https://i.imgur.com/2Lfhbdz.png)
+![panel-status-history](https://i.imgur.com/nbj9kJb.png)
 
 ### Veeam Status History
 
