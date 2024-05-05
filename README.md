@@ -374,7 +374,7 @@ and range vector, some links.
 
 # The powershell script
 
-![script_pic](https://i.imgur.com/0u6ebWn.png)
+![script_pic](https://i.imgur.com/Vb2Olmx.png)
 
 **The Script: [veeam_prometheus_info_push.ps1](https://github.com/DoTheEvo/veeam-prometheus-grafana/blob/main/veeam_prometheus_info_push.ps1)**
 
@@ -426,16 +426,20 @@ as they used different ones.
 
 #### Job run visualization
 
-This visualization of runs is not precise and can be shifted some on time line,
-but it should be precise enough for general overview.
+This visualization of runs is not precise, can be shifted some on the time line,
+but it should be enough for general overview.
 
 Job themselves report that they are running but this can miss short running jobs.
 So in adition the script checks the last jobs start time,
-if it was within the last hour the result code is set to `-1`.
+if it was within the last hour the result code is set to `-1`. So every job
+is shown at least 1 hour long.<br>
+This also means that if the script would be scheduled to run periodically
+at intervals longer than an hour, it might miss runs.
+The default deployment is every 30 minutes.
 
-We dunno if run was full backup or full syntenthic until the job is finished,
-so there is another check of last jobs end time. If it was within the last hour
-and it was full/syntenthic_full it changes the result code to `-11`.
+Until a job is finished we dunno if a run was a full backup or a full syntenthic,
+so there is also check of the last end time. If it was within the last hour
+and it was full/syntenthic_full, it changes the result code to `-11`.
 
 #### Data size and Backup size
 
