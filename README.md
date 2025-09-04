@@ -135,7 +135,7 @@ Pushgateway has **admin api** enabled too, to be able to execute wipes.
 services:
 
   prometheus:
-    image: prom/prometheus:v2.43.1
+    image: prom/prometheus:v3.5.0
     container_name: prometheus
     hostname: prometheus
     restart: unless-stopped
@@ -155,7 +155,7 @@ services:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:9.5.2
+    image: grafana/grafana:12.0
     container_name: grafana
     hostname: grafana
     restart: unless-stopped
@@ -167,12 +167,12 @@ services:
       - "3000:3000"
 
   pushgateway:
-    image: prom/pushgateway:v1.5.1
+    image: prom/pushgateway:v1.11.1
     container_name: pushgateway
     hostname: pushgateway
     restart: unless-stopped
     command:
-      - '--web.enable-admin-api'    
+      - '--web.enable-admin-api'
     ports:
       - "9091:9091"
 
@@ -196,10 +196,10 @@ GF_USERS_ALLOW_SIGN_UP=false
 GF_SERVER_ROOT_URL=https://grafana.example.com
 # GRAFANA EMAIL SETTINGS
 GF_SMTP_ENABLED=true
-GF_SMTP_HOST=smtp-relay.sendinblue.com:587
+GF_SMTP_HOST=smtp-relay.brevo.com:587
 GF_SMTP_USER=example@gmail.com
-GF_SMTP_PASSWORD=xzu0dfFhn3eqa
-startTLS_policy=NoStartTLS
+GF_SMTP_PASSWORD=xsmepzis-f2387....
+GF_SMTP_FROM_ADDRESS=grafana@example.localhost
 # GRAFANA CUSTOM SETTINGS
 # DATE FORMATS SWITCHED TO NAMES OF THE DAYS OF THE WEEK
 #GF_DATE_FORMATS_INTERVAL_HOUR = dddd
@@ -387,6 +387,9 @@ in new cmdlets in that version.
 <details>
 <summary>Changelog</summary>
 
+* v0.5
+  * Switch to using ID in agent backup, leaving reporting unafected by renaming
+  the job in veeam.
 * v0.4
   * added $ErrorActionPreference = "Stop"
     which will terminate script's execution on any error

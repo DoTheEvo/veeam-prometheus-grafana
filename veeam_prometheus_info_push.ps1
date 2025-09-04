@@ -1,4 +1,4 @@
-# v0.4  ----------------------------------------------------------------------
+# v0.5  ----------------------------------------------------------------------
 # ----------------------  CUSTOM CONFIG  -------------------------------------
 
 $GROUP = 'CocaCola'
@@ -282,7 +282,7 @@ if ($Job.BackupType -eq 'SelectedFiles') {
 
 # --------------  GET AGENT JOB BACKUP SZE  -------------------------
 
-$AgentBackup = Get-VBRBackup -Name $Job.Name
+$AgentBackup = Get-VBRBackup | ? { $_.JobId -eq $JOB_ID }
 $RestorePoints = Get-VBRRestorePoint -Backup $AgentBackup
 $BACKUP_SIZE = 0
 foreach ($r in $RestorePoints) {
